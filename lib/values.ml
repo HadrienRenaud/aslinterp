@@ -38,7 +38,9 @@ and pp_print_value f v =
         (F.pp_print_seq ~pp_sep:(make_cutter ",@ ") pp_print_struct_elem)
         (Structure.to_seq s)
   | Tuple a ->
-    F.fprintf f "@[<hv 2>( %a )@]" (F.pp_print_seq ~pp_sep:(make_cutter ",@ ") pp_print_value) (Array.to_seq a)
+      F.fprintf f "@[<hv 2>( %a )@]"
+        (F.pp_print_seq ~pp_sep:(make_cutter ",@ ") pp_print_value)
+        (Array.to_seq a)
   | Array a ->
       F.fprintf f "@[<hv 2>[ %a ]@]"
         (F.pp_print_seq ~pp_sep:(make_cutter ",@ ") pp_print_value)
