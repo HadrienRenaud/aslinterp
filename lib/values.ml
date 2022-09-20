@@ -1,9 +1,10 @@
 module Structure = Map.Make (String)
 
 type 'a structure = 'a Structure.t
+type bitstring = bool array
 
 type value =
-  | Bitstr of bool array
+  | Bitstr of bitstring
   | Int of int
   | Real of float
     (* TODO: investigate if there is a possibility for real number with unbounded precision in caml *)
@@ -45,3 +46,22 @@ and pp_print_value f v =
       F.fprintf f "@[<hv 2>[ %a ]@]"
         (F.pp_print_seq ~pp_sep:(make_cutter ",@ ") pp_print_value)
         (Array.to_seq a)
+
+let bitstring_of_int n l =
+  let s = Array.make l false in
+  Array.fold_left_map (fun n _ -> (n / 2, n mod 2 == 1)) n s |> snd
+
+let int_of_bitstring s =
+  Array.fold_right (fun b n -> (2 * n) + Bool.to_int b) s 0
+
+let int_pow a n =
+  (* Inspired by ocaml batteries
+     https://github.com/ocaml-batteries-team/batteries-included/blob/master/src/batNumber.ml#L274 *)
+  let rec pow a n =
+    if n = 0 then 1
+    else if n = 1 then a
+    else
+      let b = pow a (n / 2) in
+      b * b * if n mod 2 == 0 then 1 else a
+  in
+  pow a n

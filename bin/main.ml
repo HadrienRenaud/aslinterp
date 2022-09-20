@@ -1,16 +1,22 @@
 open Aslinterp.Values
-open Aslinterp.Expressions
-open Aslinterp.Operations
+open Aslinterp.Syntax
+open Aslinterp.Sem
 
 let () =
-  pp_print_expression Format.std_formatter
-    (BinOp
-       ( Literal (Int 3),
-         Add,
-         Slice
-           ( Var "X",
-             UnOp (Plus, Literal (Int (-4))),
-             Some (FunCall ("endslice", [ Var "X"; Literal (Enum "Reversed") ]))
-           ) ))
+  pp_print_expr Format.std_formatter
+    (EBinop
+       ( ELiteral (Int 3),
+         Plus,
+         EBinop (EVar "X", Mult, EUnop (UMinus, ELiteral (Int (-4)))) ))
+
+let () = Format.print_newline ()
+
+let () =
+  let r =
+    EBinop (ELiteral (Bitstr (bitstring_of_int 16 32)), Minus, ELiteral (Int 4))
+  in
+  match eval_expr ctx_empty r with
+  | Ok (_, v) -> pp_print_value Format.std_formatter v
+  | Error e -> pp_print_error Format.std_formatter e
 
 let () = Format.print_newline ()
