@@ -111,6 +111,18 @@ let ctx_find_res_var x c =
   ctx_find_opt_var x c |> Option.to_result ~none:(UndefinedVariable x)
 
 let ctx_empty : context = { v = SMap.empty; s = SMap.empty }
+let ctx_update_var x v c = { s = c.s; v = SMap.add x v c.v }
+
+let pp_print_context f c =
+  let pp_print_var f e =
+    let x, v = e in
+    Format.fprintf f "@[<2>\"%s\":@ %a@]" x pp_print_value v
+  in
+  Format.fprintf f "@[<hv 2>{ %a@] }"
+    (Format.pp_print_seq
+       ~pp_sep:(fun f () -> Format.fprintf f ",@ ")
+       pp_print_var)
+    (SMap.to_seq c.v)
 
 (********************************************************************************************)
 (* Expressions *)
@@ -146,3 +158,26 @@ let rec eval_expr c e =
   | Ok (c', ELiteral v) -> Ok (c', v)
   | Ok (c', e') -> eval_expr c' e'
   | Error err -> Error err
+
+(********************************************************************************************)
+(* Statements *)
+
+let rec do_one_step_stmt c s =
+  match s with
+  | SPass -> Ok (c, s)
+  | SThen (SPass, s2) -> Ok (c, s2)
+  | SThen (s1, s2) ->
+      let* c', s1' = do_one_step_stmt c s1 in
+      Ok (c', SThen (s1', s2))
+  | SAssign (LEVar x, ELiteral v) ->
+      let c' = ctx_update_var x v c in
+      Ok (c', SPass)
+  | SAssign (LEVar x, e) ->
+      let* c', e' = do_one_step_expr c e in
+      Ok (c', SAssign (LEVar x, e'))
+
+let rec eval_stmt c s =
+  match do_one_step_stmt c s with
+  | Ok (c', SPass) -> Ok c'
+  | Ok (c', s') -> eval_stmt c' s'
+  | Error e -> Error e

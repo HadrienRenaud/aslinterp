@@ -73,6 +73,8 @@ and stmt = SPass | SThen of stmt * stmt | SAssign of lexpr * expr
 *)
 and subpgm = string list * stmt
 
+let stmt_from_list = List.fold_left (fun s1 s2 -> SThen (s1, s2)) SPass
+
 open Format
 
 let pp_print_binop f (b : binop) =

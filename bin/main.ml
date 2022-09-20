@@ -12,11 +12,16 @@ let () =
 let () = Format.print_newline ()
 
 let () =
-  let r =
-    EBinop (ELiteral (Bitstr (bitstring_of_int 16 32)), Minus, ELiteral (Int 4))
+  let s =
+    stmt_from_list
+      [
+        SAssign (LEVar "x", ELiteral (Int 4));
+        SAssign (LEVar "y", ELiteral (Int 5));
+        SAssign (LEVar "r", EBinop (EVar "x", Plus, EVar "y"));
+      ]
   in
-  match eval_expr ctx_empty r with
-  | Ok (_, v) -> pp_print_value Format.std_formatter v
+  match eval_stmt ctx_empty s with
+  | Ok c -> pp_print_context Format.std_formatter c
   | Error e -> pp_print_error Format.std_formatter e
 
 let () = Format.print_newline ()

@@ -103,6 +103,8 @@ and subpgm = string list * stmt
 
 (** {2 Utilities} *)
 
+val stmt_from_list : stmt list -> stmt
+
 (** {3 Formatters} *)
 
 val pp_print_unop : Format.formatter -> unop -> unit

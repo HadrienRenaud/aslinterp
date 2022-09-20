@@ -32,8 +32,17 @@ val ctx_find_opt_var : Syntax.identifier -> context -> Values.value option
     Returns None if the variable is not defined. *)
 
 val ctx_empty : context
+(** The empty context. *)
+
+val ctx_update_var : Syntax.identifier -> Values.value -> context -> context
+val pp_print_context : Format.formatter -> context -> unit
 
 (** {2 Semantics of expressions } *)
 
 val do_one_step_expr : context -> Syntax.expr -> (context * Syntax.expr) result
 val eval_expr : context -> Syntax.expr -> (context * Values.value) result
+
+(** {2 Semantics of statements } *)
+
+val do_one_step_stmt : context -> Syntax.stmt -> (context * Syntax.stmt) result
+val eval_stmt : context -> Syntax.stmt -> context result
