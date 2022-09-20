@@ -35,12 +35,5 @@ val ctx_empty : context
 
 (** {2 Semantics of expressions } *)
 
-type expr_reduction_status =
-  | Finished of context * Values.value
-  | OneStepDone of context * Syntax.expr
-  | Err of error
-
-val do_one_step_expr : context -> Syntax.expr -> expr_reduction_status
-
-val eval_expr :
-  context -> Syntax.expr -> (context * Values.value, error) Result.t
+val do_one_step_expr : context -> Syntax.expr -> (context * Syntax.expr) result
+val eval_expr : context -> Syntax.expr -> (context * Values.value) result

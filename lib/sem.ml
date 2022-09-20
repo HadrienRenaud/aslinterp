@@ -106,50 +106,43 @@ let eval_unop o v =
 type context = { v : Values.value SMap.t; s : Syntax.subpgm SMap.t }
 
 let ctx_find_opt_var x c = SMap.find_opt x c.v
+
+let ctx_find_res_var x c =
+  ctx_find_opt_var x c |> Option.to_result ~none:(UndefinedVariable x)
+
 let ctx_empty : context = { v = SMap.empty; s = SMap.empty }
 
 (********************************************************************************************)
 (* Expressions *)
 
-open Values
 open Syntax
 
-type expr_reduction_status =
-  | Finished of context * value
-  | OneStepDone of context * expr
-  | Err of error
+let ( let* ) = Result.bind
 
 let rec do_one_step_expr c e =
   match e with
-  | ELiteral v -> Finished (c, v)
-  | EVar x -> (
-      match ctx_find_opt_var x c with
-      | Some v -> Finished (c, v)
-      | None -> Err (UndefinedVariable x))
-  | EUnop (o, ELiteral v) -> (
-      match eval_unop o v with Ok v' -> Finished (c, v') | Error er -> Err er)
-  | EUnop (o, e') -> (
-      match do_one_step_expr c e' with
-      | Finished (c, v) -> OneStepDone (c, EUnop (o, ELiteral v))
-      | OneStepDone (c, e'') -> OneStepDone (c, EUnop (o, e''))
-      | other -> other)
-  | EBinop (ELiteral v1, o, ELiteral v2) -> (
-      match eval_binop v1 o v2 with
-      | Ok v' -> Finished (c, v')
-      | Error er -> Err er)
-  | EBinop (ELiteral v1, o, e2) -> (
-      match do_one_step_expr c e2 with
-      | Finished (c, v2) -> OneStepDone (c, EBinop (ELiteral v1, o, ELiteral v2))
-      | OneStepDone (c, e2') -> OneStepDone (c, EBinop (ELiteral v1, o, e2'))
-      | other -> other)
-  | EBinop (e1, o, e2) -> (
-      match do_one_step_expr c e1 with
-      | Finished (c, v1) -> OneStepDone (c, EBinop (ELiteral v1, o, e2))
-      | OneStepDone (c, e1') -> OneStepDone (c, EBinop (e1', o, e2))
-      | other -> other)
+  | ELiteral _ -> Ok (c, e)
+  | EVar x ->
+      let* v = ctx_find_res_var x c in
+      Ok (c, ELiteral v)
+  | EUnop (o, ELiteral v) ->
+      let* v' = eval_unop o v in
+      Ok (c, ELiteral v')
+  | EUnop (o, e') ->
+      let* c, e'' = do_one_step_expr c e' in
+      Ok (c, EUnop (o, e''))
+  | EBinop (ELiteral v1, o, ELiteral v2) ->
+      let* v = eval_binop v1 o v2 in
+      Ok (c, ELiteral v)
+  | EBinop (ELiteral v1, o, e2) ->
+      let* c, e2' = do_one_step_expr c e2 in
+      Ok (c, EBinop (ELiteral v1, o, e2'))
+  | EBinop (e1, o, e2) ->
+      let* c, e1' = do_one_step_expr c e1 in
+      Ok (c, EBinop (e1', o, e2))
 
 let rec eval_expr c e =
   match do_one_step_expr c e with
-  | Finished (c, v) -> Ok (c, v)
-  | OneStepDone (c, e) -> eval_expr c e
-  | Err e -> Error e
+  | Ok (c', ELiteral v) -> Ok (c', v)
+  | Ok (c', e') -> eval_expr c' e'
+  | Error err -> Error err
