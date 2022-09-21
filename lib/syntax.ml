@@ -26,6 +26,9 @@ type binop =
 type unop = UMinus  (** [-] *) | UBNeg  (** [!] *) | UNot  (** [NOT] *)
 type identifier = string
 
+module IdMap = Map.Make (String)
+module IdSet = Set.Make (String)
+
 type expr =
   | ELiteral of Values.value  (** A direct value *)
   | EVar of identifier  (** A variable *)

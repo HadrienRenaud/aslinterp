@@ -1,7 +1,5 @@
 (* Prolog *)
 
-module SMap = Map.Make (String)
-
 type error =
   | DivisionByZero
   | UnsupportedOperation of string
@@ -105,17 +103,24 @@ let eval_unop o v =
 (********************************************************************************************)
 (* Contexts *)
 
-type context = { v : Values.value SMap.t; s : Syntax.subpgm SMap.t }
+type context = {
+  v : Values.value IdMap.t;
+  s : Syntax.subpgm IdMap.t;
+  d : IdSet.t;
+  u : IdSet.t;
+}
 
-let ctx_find_opt_var x c = SMap.find_opt x c.v
+let ctx_find_opt_var x { v; _ } = IdMap.find_opt x v
 
 let ctx_find_res_var x c =
   ctx_find_opt_var x c |> Option.to_result ~none:(UndefinedVariable x)
 
-let ctx_empty : context = { v = SMap.empty; s = SMap.empty }
-let ctx_update_var x v c = { s = c.s; v = SMap.add x v c.v }
+let ctx_empty : context =
+  { v = IdMap.empty; s = IdMap.empty; d = IdSet.empty; u = IdSet.empty }
 
-let pp_print_context f c =
+let ctx_update_var x v c = { c with v = IdMap.add x v c.v }
+
+let pp_print_context f { v; _ } =
   let pp_print_var f e =
     let x, v = e in
     Format.fprintf f "@[<2>\"%s\":@ %a@]" x pp_print_value v
@@ -124,7 +129,7 @@ let pp_print_context f c =
     (Format.pp_print_seq
        ~pp_sep:(fun f () -> Format.fprintf f ",@ ")
        pp_print_var)
-    (SMap.to_seq c.v)
+    (IdMap.to_seq v)
 
 (********************************************************************************************)
 (* Expressions *)

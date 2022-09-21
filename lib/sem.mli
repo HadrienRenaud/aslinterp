@@ -1,6 +1,5 @@
 (** The semantics of ASL *)
 
-module SMap : Map.S with type key = string
 (** {2 Prolog} *)
 
 type error =
@@ -25,7 +24,12 @@ val eval_unop : Syntax.unop -> Values.value -> Values.value result
 
 (** {2 Reduction contexts} *)
 
-type context = { v : Values.value SMap.t; s : Syntax.subpgm SMap.t }
+type context = {
+  v : Values.value Syntax.IdMap.t;
+  s : Syntax.subpgm Syntax.IdMap.t;
+  d : Syntax.IdSet.t;
+  u : Syntax.IdSet.t;
+}
 (** context is the reduction environment. *)
 
 val ctx_find_opt_var : Syntax.identifier -> context -> Values.value option

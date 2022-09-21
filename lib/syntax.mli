@@ -46,6 +46,9 @@ type unop = UMinus  (** [-] *) | UBNeg  (** [!] *) | UNot  (** [NOT] *)
 type identifier = string
 (** The type of named element in the program, such as variables, functions, fields .. *)
 
+module IdMap : Map.S with type key = identifier
+module IdSet : Set.S with type elt = identifier
+
 (** Expressions as defined by chapter 5. *)
 type expr =
   | ELiteral of Values.value  (** A direct value *)
