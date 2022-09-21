@@ -104,6 +104,10 @@ and subpgm = string list * stmt
 (** {2 Utilities} *)
 
 val stmt_from_list : stmt list -> stmt
+(** Constructs a statement from a list of statements by putting them in a tree of [SThen] *)
+
+val is_literal : expr -> bool
+(** Returns true if the argument is a literal, false otherwise *)
 
 (** {3 Formatters} *)
 

@@ -8,6 +8,7 @@ type error =
   | UnsupportedOperation of string
   | SemanticError of string
   | UndefinedVariable of string
+  | InterpretorError of string
 
 val pp_print_error : Format.formatter -> error -> unit
 

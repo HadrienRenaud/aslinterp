@@ -7,6 +7,7 @@ type error =
   | UnsupportedOperation of string
   | SemanticError of string
   | UndefinedVariable of string
+  | InterpretorError of string
 
 let pp_print_error f e =
   match e with
@@ -14,6 +15,7 @@ let pp_print_error f e =
   | UnsupportedOperation s -> Format.fprintf f "Unsupported operation: %s" s
   | SemanticError s -> Format.fprintf f "Semantic error: %s" s
   | UndefinedVariable x -> Format.fprintf f "Variable %s is undefined." x
+  | InterpretorError s -> Format.fprintf f "Internal error: %s" s
 
 type 'a result = ('a, error) Result.t
 
@@ -133,25 +135,39 @@ let ( let* ) = Result.bind
 
 let rec do_one_step_expr c e =
   match e with
-  | ELiteral _ -> Ok (c, e)
+  (* Do nothing on literals *)
+  | ELiteral _ -> Error (InterpretorError "Trying to reduce a literal.")
+  (* Rule Extract-Context  *)
   | EVar x ->
       let* v = ctx_find_res_var x c in
       Ok (c, ELiteral v)
+  (* Rules Reduce-Unop-* *)
   | EUnop (o, ELiteral v) ->
       let* v' = eval_unop o v in
       Ok (c, ELiteral v')
+  (* Rules Progress-Unop-* *)
   | EUnop (o, e') ->
       let* c, e'' = do_one_step_expr c e' in
       Ok (c, EUnop (o, e''))
+  (* Rules Reduce-Binop-* *)
   | EBinop (ELiteral v1, o, ELiteral v2) ->
       let* v = eval_binop v1 o v2 in
       Ok (c, ELiteral v)
-  | EBinop (ELiteral v1, o, e2) ->
+  (* Rules Progress-Binop-Right-* *)
+  | EBinop (e1, o, e2) when not (is_literal e2) ->
       let* c, e2' = do_one_step_expr c e2 in
-      Ok (c, EBinop (ELiteral v1, o, e2'))
-  | EBinop (e1, o, e2) ->
+      Ok (c, EBinop (e1, o, e2'))
+  (* Rules Progress-Binop-Left-* *)
+  | EBinop (e1, o, e2) when not (is_literal e1) ->
       let* c, e1' = do_one_step_expr c e1 in
       Ok (c, EBinop (e1', o, e2))
+  (* Final match to guard everything.
+     Should not happen, but otherwise this does not compile. *)
+  | _ ->
+      Error
+        (InterpretorError
+           (Format.asprintf "Interpretor blocked on expression:@ %a"
+              pp_print_expr e))
 
 let rec eval_expr c e =
   match do_one_step_expr c e with
@@ -164,14 +180,18 @@ let rec eval_expr c e =
 
 let rec do_one_step_stmt c s =
   match s with
-  | SPass -> Ok (c, s)
+  | SPass -> Error (InterpretorError "Blocked at a pass statement")
+  (* Rule Reduce-Then-Left *)
   | SThen (SPass, s2) -> Ok (c, s2)
+  (* Rule Progress-Then-Left *)
   | SThen (s1, s2) ->
       let* c', s1' = do_one_step_stmt c s1 in
       Ok (c', SThen (s1', s2))
+  (* Rule Reduce-Assign *)
   | SAssign (LEVar x, ELiteral v) ->
       let c' = ctx_update_var x v c in
       Ok (c', SPass)
+  (* Rule Progress-Assign *)
   | SAssign (LEVar x, e) ->
       let* c', e' = do_one_step_expr c e in
       Ok (c', SAssign (LEVar x, e'))
