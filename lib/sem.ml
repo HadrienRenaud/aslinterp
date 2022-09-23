@@ -214,10 +214,6 @@ let rec do_one_step_stmt c s =
   match s with
   (* Rule Reduce-Then-Left *)
   | SThen (SPass, s2) -> Ok (c, s2)
-  (* Rule Progress-Then-Left *)
-  | SThen (s1, s2) ->
-      let* c', s1' = do_one_step_stmt c s1 in
-      Ok (c', SThen (s1', s2))
   (* Rule Reduce-Assign *)
   | SAssign (LEVar x, ELiteral v) when ctx_can_set_var x c ->
       let c' = ctx_update_var x v c in
@@ -226,6 +222,21 @@ let rec do_one_step_stmt c s =
   | SAssign (LEVar x, e) ->
       let* c', e' = do_one_step_expr c e in
       Ok (c', SAssign (LEVar x, e'))
+  (* Rules Progress-Then-* *)
+  | SThen (s1, s2) -> (
+      let cr = ctx_expand_uses_defs s1 c in
+      match do_one_step_stmt cr s2 with
+      (* If a reduction happened on the right *)
+      | Ok (cr', s2') ->
+          let c' = ctx_discard_uses_defs c cr' in
+          Ok (c', SThen (s1, s2'))
+      (* If no reduction could happen on the right, we are backtracking *)
+      | Error BlockedInterpretor ->
+          let* c', s1' = do_one_step_stmt c s1 in
+          Ok (c', SThen (s1', s2))
+      (* If an other error happened, we propagate the error.
+         TODO: should we execute on the left first? *)
+      | Error err -> Error err)
   | _ -> Error BlockedInterpretor
 
 let rec eval_stmt c s =
