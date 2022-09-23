@@ -6,6 +6,7 @@ type error =
   | SemanticError of string
   | UndefinedVariable of string
   | InterpretorError of string
+  | BlockedInterpretor
 
 let pp_print_error f e =
   match e with
@@ -14,6 +15,7 @@ let pp_print_error f e =
   | SemanticError s -> Format.fprintf f "Semantic error: %s" s
   | UndefinedVariable x -> Format.fprintf f "Variable %s is undefined." x
   | InterpretorError s -> Format.fprintf f "Internal error: %s" s
+  | BlockedInterpretor -> Format.pp_print_string f "Blocked interpretor"
 
 type 'a result = ('a, error) Result.t
 
@@ -119,8 +121,39 @@ let ctx_empty : context =
   { v = IdMap.empty; s = IdMap.empty; d = IdSet.empty; u = IdSet.empty }
 
 let ctx_update_var x v c = { c with v = IdMap.add x v c.v }
+let ctx_can_use_var x c = not @@ IdSet.mem x c.d
+let ctx_can_set_var x c = (not (IdSet.mem x c.d)) && not (IdSet.mem x c.u)
 
-let pp_print_context f { v; _ } =
+let rec uses_expr = function
+  | ELiteral _ -> IdSet.empty
+  | EVar x -> IdSet.singleton x
+  | EUnop (_, e) -> uses_expr e
+  | EBinop (e1, _, e2) -> IdSet.union (uses_expr e1) (uses_expr e2)
+
+let defs_expr _ = IdSet.empty
+(* For the moment, when we will have function calls, it might get different. *)
+
+let rec uses_stmt = function
+  | SPass -> IdSet.empty
+  | SAssign (LEVar _, e) -> uses_expr e
+  | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
+
+let rec defs_stmt = function
+  | SPass -> IdSet.empty
+  | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
+  | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
+
+let ctx_expand_uses_defs s c =
+  {
+    v = c.v;
+    s = c.s;
+    u = IdSet.union c.u (uses_stmt s);
+    d = IdSet.union c.d (defs_stmt s);
+  }
+
+let ctx_discard_uses_defs { d; u; _ } { v; s; _ } = { d; u; v; s }
+
+let pp_print_context f c =
   let pp_print_var f e =
     let x, v = e in
     Format.fprintf f "@[<2>\"%s\":@ %a@]" x pp_print_value v
@@ -129,7 +162,7 @@ let pp_print_context f { v; _ } =
     (Format.pp_print_seq
        ~pp_sep:(fun f () -> Format.fprintf f ",@ ")
        pp_print_var)
-    (IdMap.to_seq v)
+    (IdMap.to_seq c.v)
 
 (********************************************************************************************)
 (* Expressions *)
@@ -140,10 +173,8 @@ let ( let* ) = Result.bind
 
 let rec do_one_step_expr c e =
   match e with
-  (* Do nothing on literals *)
-  | ELiteral _ -> Error (InterpretorError "Trying to reduce a literal.")
   (* Rule Extract-Context  *)
-  | EVar x ->
+  | EVar x when ctx_can_use_var x c ->
       let* v = ctx_find_res_var x c in
       Ok (c, ELiteral v)
   (* Rules Reduce-Unop-* *)
@@ -168,11 +199,7 @@ let rec do_one_step_expr c e =
       Ok (c, EBinop (e1', o, e2))
   (* Final match to guard everything.
      Should not happen, but otherwise this does not compile. *)
-  | _ ->
-      Error
-        (InterpretorError
-           (Format.asprintf "Interpretor blocked on expression:@ %a"
-              pp_print_expr e))
+  | _ -> Error BlockedInterpretor
 
 let rec eval_expr c e =
   match do_one_step_expr c e with
@@ -185,7 +212,6 @@ let rec eval_expr c e =
 
 let rec do_one_step_stmt c s =
   match s with
-  | SPass -> Error (InterpretorError "Blocked at a pass statement")
   (* Rule Reduce-Then-Left *)
   | SThen (SPass, s2) -> Ok (c, s2)
   (* Rule Progress-Then-Left *)
@@ -193,13 +219,14 @@ let rec do_one_step_stmt c s =
       let* c', s1' = do_one_step_stmt c s1 in
       Ok (c', SThen (s1', s2))
   (* Rule Reduce-Assign *)
-  | SAssign (LEVar x, ELiteral v) ->
+  | SAssign (LEVar x, ELiteral v) when ctx_can_set_var x c ->
       let c' = ctx_update_var x v c in
       Ok (c', SPass)
   (* Rule Progress-Assign *)
   | SAssign (LEVar x, e) ->
       let* c', e' = do_one_step_expr c e in
       Ok (c', SAssign (LEVar x, e'))
+  | _ -> Error BlockedInterpretor
 
 let rec eval_stmt c s =
   match do_one_step_stmt c s with
