@@ -11,6 +11,7 @@ type value =
       (** Real number in the mathematical sense, unbounded in size or precision *)
   (* TODO: investigate if there is a possibility for real number with unbounded precision in caml *)
   | Bool of bool  (** Boolean *)
+  | String of string  (** Strings *)
   | Enum of string  (** Enumeration, ie a member of a set of named values *)
     (* as a named value cannot be shared between different enumerations, we do not have to specify of which enumeration we are talking. *)
   | Struct of value structure

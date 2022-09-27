@@ -8,6 +8,7 @@ type value =
   | Int of Z.t
   | Real of Q.t
   | Bool of bool
+  | String of string
   | Enum of string
     (* as a named value cannot be shared between different enumerations, we do not have to specify of which enumeration we are talking. *)
   | Struct of value structure
@@ -28,9 +29,10 @@ and pp_print_value f v =
   | Real x -> Q.pp_print f x
   | Int x -> Z.pp_print f x
   | Bool b -> F.pp_print_bool f b
+  | String s -> F.fprintf f "@[<h>\"%s\"@]" s
   | Enum s -> F.pp_print_string f s
   | Bitstr a ->
-      F.fprintf f "@[<h>\"%a\"@]"
+      F.fprintf f "@[<h>b\"%a\"@]"
         (F.pp_print_seq ~pp_sep:(make_cutter "") pp_print_bit)
         (Array.to_seq a)
   | Struct s ->
