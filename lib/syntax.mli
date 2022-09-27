@@ -116,13 +116,6 @@ val stmt_from_list : stmt list -> stmt
 val is_literal : expr -> bool
 (** Returns true if the argument is a literal, false otherwise *)
 
-(** {3 Concurrent helpers} *)
-
-val uses_expr : expr -> IdSet.t
-val uses_stmt : stmt -> IdSet.t
-val defs_expr : expr -> IdSet.t
-val defs_stmt : stmt -> IdSet.t
-
 (** {3 Formatters} *)
 
 val pp_print_unop : Format.formatter -> unop -> unit
