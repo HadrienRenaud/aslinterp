@@ -34,6 +34,7 @@ type expr =
   | EVar of identifier  (** A variable *)
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
+  | EArrayGet of expr * expr  (** [e1[e2]] *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)
@@ -126,6 +127,8 @@ let rec pp_print_expr f e =
         pp_print_expr e2
   | EVar x -> pp_print_string f x
   | ELiteral v -> Values.pp_print_value f v
+  | EArrayGet (a, i) ->
+      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_expr a pp_print_expr i
 
 and pp_print_lexpr f e = match e with LEVar x -> pp_print_string f x
 

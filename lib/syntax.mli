@@ -55,6 +55,7 @@ type expr =
   | EVar of identifier  (** A variable *)
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
+  | EArrayGet of expr * expr  (** [e1[e2]] *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)

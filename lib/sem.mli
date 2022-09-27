@@ -9,6 +9,7 @@ type error =
   | UndefinedVariable of string
   | InterpretorError of string
   | BlockedInterpretor
+  | OutOfBoundError of int * int
 
 val pp_print_error : Format.formatter -> error -> unit
 

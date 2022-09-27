@@ -6,8 +6,11 @@ let () =
   let s =
     stmt_from_list
       [
+        SAssign
+          ( LEVar "Mem",
+            ELiteral (make_array [ make_int 3; make_int 4; make_int 5 ]) );
         SAssign (LEVar "x", ELiteral (make_bitstring 5 8));
-        SAssign (LEVar "y", ELiteral (make_bitstring 4 8));
+        SAssign (LEVar "y", EArrayGet (EVar "Mem", ELiteral (make_int 1)));
         SAssign (LEVar "r", EBinop (EVar "x", Plus, EVar "y"));
         SCond
           ( EBinop (EVar "x", Eq, EVar "y"),

@@ -7,6 +7,7 @@ type error =
   | UndefinedVariable of string
   | InterpretorError of string
   | BlockedInterpretor
+  | OutOfBoundError of int * int
 
 let pp_print_error f e =
   match e with
@@ -16,6 +17,8 @@ let pp_print_error f e =
   | UndefinedVariable x -> Format.fprintf f "Variable %s is undefined." x
   | InterpretorError s -> Format.fprintf f "Internal error: %s" s
   | BlockedInterpretor -> Format.pp_print_string f "Blocked interpretor"
+  | OutOfBoundError (i, l) ->
+      Format.fprintf f "Out of bound array acces: index %d >= length %d" i l
 
 type 'a result = ('a, error) Result.t
 
@@ -129,6 +132,8 @@ let rec uses_expr = function
   | EVar x -> IdSet.singleton x
   | EUnop (_, e) -> uses_expr e
   | EBinop (e1, _, e2) -> IdSet.union (uses_expr e1) (uses_expr e2)
+  (* TODO: change next line *)
+  | EArrayGet (e1, e2) -> IdSet.union (uses_expr e1) (uses_expr e2)
 
 let defs_expr _ = IdSet.empty
 (* For the moment, when we will have function calls, it might get different. *)
@@ -201,6 +206,19 @@ let rec do_one_step_expr c e =
   | EBinop (e1, o, e2) when not (is_literal e1) ->
       let* c, e1' = do_one_step_expr c e1 in
       Ok (c, EBinop (e1', o, e2))
+  (* Rule Reduce-Array-Get *)
+  | EArrayGet (ELiteral (Array a), ELiteral (Int i)) ->
+      let i = Z.to_int i in
+      if i < Array.length a then Ok (c, ELiteral (Array.get a i))
+      else Error (OutOfBoundError (i, Array.length a))
+  (* Rule Progress-Array-Right *)
+  | EArrayGet (e1, e2) when not (is_literal e2) ->
+      let* c, e2' = do_one_step_expr c e2 in
+      Ok (c, EArrayGet (e1, e2'))
+  (* Rule Progress-Array-Left *)
+  | EArrayGet (e1, e2) when not (is_literal e1) ->
+      let* c, e1' = do_one_step_expr c e1 in
+      Ok (c, EArrayGet (e1', e2))
   (* Final match to guard everything.
      Should not happen, but otherwise this does not compile. *)
   | _ -> Error BlockedInterpretor

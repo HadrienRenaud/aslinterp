@@ -25,3 +25,4 @@ val z_of_bitstring : bitstring -> Z.t
 val make_int : int -> value
 val make_real : float -> value
 val make_bitstring : int -> int -> value
+val make_array : value list -> value
