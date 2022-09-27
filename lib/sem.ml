@@ -35,27 +35,27 @@ let eval_binop v1 o v2 =
   | Int x, Leq, Int y -> Ok (Bool (x <= y))
   | Int x, GT, Int y -> Ok (Bool (x > y))
   | Int x, Geq, Int y -> Ok (Bool (x >= y))
-  | Int x, Plus, Int y -> Ok (Int (x + y))
-  | Int x, Minus, Int y -> Ok (Int (x - y))
-  | Int x, Mult, Int y -> Ok (Int (x * y))
-  | Int _, DIV, Int 0 -> Error DivisionByZero
-  | Int x, DIV, Int y -> Ok (Int (x / y))
-  | Int _, MOD, Int 0 -> Error DivisionByZero
-  | Int x, MOD, Int y -> Ok (Int (x mod y))
-  | Int x, RSh, Int y -> Ok (Int (x asr y))
-  | Int x, LSh, Int y -> Ok (Int (x lsl y))
-  | Int x, Pow, Int y -> Ok (Int (int_pow x y))
+  | Int x, Plus, Int y -> Ok (Int Z.(x + y))
+  | Int x, Minus, Int y -> Ok (Int Z.(x - y))
+  | Int x, Mult, Int y -> Ok (Int Z.(x * y))
+  | Int _, DIV, Int y when y = Z.zero -> Error DivisionByZero
+  | Int x, DIV, Int y -> Ok (Int Z.(x / y))
+  | Int _, MOD, Int y when y = Z.zero -> Error DivisionByZero
+  | Int x, MOD, Int y -> Ok (Int Z.(x mod y))
+  | Int x, RSh, Int y -> Ok (Int Z.(x asr Z.to_int y))
+  | Int x, LSh, Int y -> Ok (Int Z.(x lsl Z.to_int y))
+  | Int x, Pow, Int y -> Ok (Int Z.(x ** Z.to_int y))
   (* Operations on Real *)
   | Real x, LT, Real y -> Ok (Bool (x < y))
   | Real x, Leq, Real y -> Ok (Bool (x <= y))
   | Real x, GT, Real y -> Ok (Bool (x > y))
   | Real x, Geq, Real y -> Ok (Bool (x >= y))
-  | Real x, Plus, Real y -> Ok (Real (x +. y))
-  | Real x, Minus, Real y -> Ok (Real (x -. y))
-  | Real x, Mult, Real y -> Ok (Real (x *. y))
-  | Real _, RDiv, Real 0. -> Error DivisionByZero
-  | Real x, RDiv, Real y -> Ok (Real (x /. y))
-  | Real x, Pow, Int y -> Ok (Real (x ** float_of_int y))
+  | Real x, Plus, Real y -> Ok (Real Q.(x + y))
+  | Real x, Minus, Real y -> Ok (Real Q.(x - y))
+  | Real x, Mult, Real y -> Ok (Real Q.(x * y))
+  | Real _, RDiv, Real y when y = Q.zero -> Error DivisionByZero
+  | Real x, RDiv, Real y -> Ok (Real Q.(x / y))
+  | Real x, Pow, Int y -> Ok (Real (Q.of_float (Q.to_float x ** Z.to_float y)))
   (* Operations on boolean *)
   | Bool a, BAnd, Bool b -> Ok (Bool (a && b))
   | Bool a, BOr, Bool b -> Ok (Bool (a || b))
@@ -67,22 +67,22 @@ let eval_binop v1 o v2 =
   | Bitstr s1, And, Bitstr s2 -> Ok (Bitstr (Array.map2 ( && ) s1 s2))
   | Bitstr s1, Or, Bitstr s2 -> Ok (Bitstr (Array.map2 ( || ) s1 s2))
   | Bitstr s1, Plus, Bitstr s2 ->
-      let i1 = int_of_bitstring s1 in
-      let i2 = int_of_bitstring s2 in
-      let s3 = bitstring_of_int (i1 + i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let i2 = z_of_bitstring s2 in
+      let s3 = bitstring_of_z (Z.add i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | Bitstr s1, Minus, Bitstr s2 ->
-      let i1 = int_of_bitstring s1 in
-      let i2 = int_of_bitstring s2 in
-      let s3 = bitstring_of_int (i1 - i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let i2 = z_of_bitstring s2 in
+      let s3 = bitstring_of_z (Z.sub i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | Bitstr s1, Plus, Int i2 ->
-      let i1 = int_of_bitstring s1 in
-      let s3 = bitstring_of_int (i1 + i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let s3 = bitstring_of_z (Z.add i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | Bitstr s1, Minus, Int i2 ->
-      let i1 = int_of_bitstring s1 in
-      let s3 = bitstring_of_int (i1 - i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let s3 = bitstring_of_z (Z.sub i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | _ ->
       Error
@@ -94,8 +94,8 @@ let eval_unop o v =
   match (o, v) with
   | UBNeg, Bool b -> Ok (Bool (not b))
   | UNot, Bitstr s -> Ok (Bitstr (Array.map not s))
-  | UMinus, Int x -> Ok (Int ~-x)
-  | UMinus, Real x -> Ok (Real ~-.x)
+  | UMinus, Int x -> Ok (Int (Z.neg x))
+  | UMinus, Real x -> Ok (Real (Q.neg x))
   | _ ->
       Error
         (UnsupportedOperation

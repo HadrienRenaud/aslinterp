@@ -5,9 +5,8 @@ type bitstring = bool array
 
 type value =
   | Bitstr of bitstring
-  | Int of int
-  | Real of float
-    (* TODO: investigate if there is a possibility for real number with unbounded precision in caml *)
+  | Int of Z.t
+  | Real of Q.t
   | Bool of bool
   | Enum of string
     (* as a named value cannot be shared between different enumerations, we do not have to specify of which enumeration we are talking. *)
@@ -26,8 +25,8 @@ let rec pp_print_struct_elem f e =
 
 and pp_print_value f v =
   match v with
-  | Real x -> F.pp_print_float f x
-  | Int x -> F.pp_print_int f x
+  | Real x -> Q.pp_print f x
+  | Int x -> Z.pp_print f x
   | Bool b -> F.pp_print_bool f b
   | Enum s -> F.pp_print_string f s
   | Bitstr a ->
@@ -47,21 +46,17 @@ and pp_print_value f v =
         (F.pp_print_seq ~pp_sep:(make_cutter ",@ ") pp_print_value)
         (Array.to_seq a)
 
-let bitstring_of_int n l =
-  let s = Array.make l false in
-  Array.fold_left_map (fun n _ -> (n / 2, n mod 2 == 1)) n s |> snd
-
-let int_of_bitstring s =
-  Array.fold_right (fun b n -> (2 * n) + Bool.to_int b) s 0
-
-let int_pow a n =
-  (* Inspired by ocaml batteries
-     https://github.com/ocaml-batteries-team/batteries-included/blob/master/src/batNumber.ml#L274 *)
-  let rec pow a n =
-    if n = 0 then 1
-    else if n = 1 then a
-    else
-      let b = pow a (n / 2) in
-      b * b * if n mod 2 == 0 then 1 else a
+let bitstring_of_z n l =
+  let add_trailing_zeros s = Seq.append s (Seq.repeat false) in
+  let unfolder n =
+    if n == Z.zero then None else Some Z.(n mod ~$2 == one, n / ~$2)
   in
-  pow a n
+  Seq.unfold unfolder n |> add_trailing_zeros |> Seq.take l |> Array.of_seq
+
+let z_of_bitstring s =
+  let folder n i b = if b then Z.(n + (one lsl i)) else n in
+  Seq.fold_lefti folder Z.zero (Array.to_seq s)
+
+let make_int x = Int (Z.of_int x)
+let make_real x = Real (Q.of_float x)
+let make_bitstring x l = Bitstr (bitstring_of_z (Z.of_int x) l)
