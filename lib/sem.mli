@@ -51,6 +51,10 @@ val ctx_empty : context
 val ctx_update_var : Syntax.identifier -> Values.value -> context -> context
 (** Add new value bind to var in a context *)
 
+val ctx_update_array :
+  Syntax.identifier -> int -> Values.value -> context -> context result
+(** Bind index i of array to a new value in context. *)
+
 (** {4 Concurrent helpers}
 
     Those do not interfere with execution in the sequential case.
@@ -71,6 +75,9 @@ val ctx_can_set_var : Syntax.identifier -> context -> bool
     Does not check if the name is not already taken by a function nor a unsettable variable.
 *)
 
+val ctx_can_set_array : Syntax.identifier -> int -> context -> bool
+(** Check if the ith case of the variable can be set in context. *)
+
 val uses_expr : Syntax.expr -> Syntax.IdSet.t
 (** Determines what cannot be eagerly modified based on what variables this expression uses.
 *)
@@ -78,9 +85,16 @@ val uses_expr : Syntax.expr -> Syntax.IdSet.t
 val uses_stmt : Syntax.stmt -> Syntax.IdSet.t
 (** Determines what cannot be eagerly modified based on what variables this statement uses. *)
 
+val uses_lexpr : Syntax.lexpr -> Syntax.IdSet.t
+(** Determines what cannot be eagerly modified based on what variables this left-expr uses. *)
+
 val defs_expr : Syntax.expr -> Syntax.IdSet.t
 (** Determines what cannot be eagerly fetched from context based on what variables this
     expression defines. *)
+
+val defs_lexpr : Syntax.lexpr -> Syntax.IdSet.t
+(** Determines what cannot be eagerly fetched from context based on what variables this
+    left-expr defines. *)
 
 val defs_stmt : Syntax.stmt -> Syntax.IdSet.t
 (** Determines what cannot be eagerly fetched from context based on what variables this

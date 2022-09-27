@@ -73,7 +73,7 @@ type expr =
 
 (** {3 Statements} *)
 
-and lexpr = LEVar of identifier
+and lexpr = LEVar of identifier | LEArraySet of lexpr * expr
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier

@@ -50,7 +50,7 @@ type expr =
    | EStruct of (string * expr) list
 *)
 
-and lexpr = LEVar of identifier
+and lexpr = LEVar of identifier | LEArraySet of lexpr * expr
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier
@@ -130,7 +130,11 @@ let rec pp_print_expr f e =
   | EArrayGet (a, i) ->
       fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_expr a pp_print_expr i
 
-and pp_print_lexpr f e = match e with LEVar x -> pp_print_string f x
+and pp_print_lexpr f e =
+  match e with
+  | LEVar x -> pp_print_string f x
+  | LEArraySet (le, e) ->
+      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_lexpr le pp_print_expr e
 
 and pp_print_stmt f s =
   match s with

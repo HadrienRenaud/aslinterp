@@ -124,8 +124,23 @@ let ctx_empty : context =
   { v = IdMap.empty; s = IdMap.empty; d = IdSet.empty; u = IdSet.empty }
 
 let ctx_update_var x v c = { c with v = IdMap.add x v c.v }
+
+let ctx_update_array x i v c =
+  match IdMap.find x c.v with
+  | Array a ->
+      let a' = Array.copy a in
+      let () = Array.set a' i v in
+      Ok { c with v = IdMap.add x (Array a') c.v }
+  | _ ->
+      Error
+        (UnsupportedOperation
+           "Trying to assign to something which is not an array.")
+
 let ctx_can_use_var x c = not @@ IdSet.mem x c.d
 let ctx_can_set_var x c = (not (IdSet.mem x c.d)) && not (IdSet.mem x c.u)
+
+(* let ctx_can_use_array x _i c = ctx_can_use_var x c *)
+let ctx_can_set_array x _i c = ctx_can_set_var x c
 
 let rec uses_expr = function
   | ELiteral _ -> IdSet.empty
@@ -138,16 +153,25 @@ let rec uses_expr = function
 let defs_expr _ = IdSet.empty
 (* For the moment, when we will have function calls, it might get different. *)
 
+let rec uses_lexpr = function
+  | LEVar _ -> IdSet.empty
+  | LEArraySet (le, e) -> IdSet.union (uses_lexpr le) (uses_expr e)
+
+let rec defs_lexpr = function
+  | LEVar x -> IdSet.singleton x
+  (* TODO change to use precision from e *)
+  | LEArraySet (le, _e) -> defs_lexpr le
+
 let rec uses_stmt = function
   | SPass -> IdSet.empty
-  | SAssign (LEVar _, e) -> uses_expr e
+  | SAssign (le, e) -> IdSet.union (uses_lexpr le) (uses_expr e)
   | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
   | SCond (e, s1, s2) ->
       IdSet.union (uses_expr e) @@ IdSet.union (uses_stmt s1) (uses_stmt s2)
 
 let rec defs_stmt = function
   | SPass -> IdSet.empty
-  | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
+  | SAssign (le, e) -> IdSet.union (defs_lexpr le) (defs_expr e)
   | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
   | SCond (e, s1, s2) ->
       IdSet.union (uses_expr e) @@ IdSet.union (defs_stmt s1) (defs_stmt s2)
@@ -240,14 +264,19 @@ let rec do_one_step_stmt c s =
   | SThen (s1, s2) ->
       let* c', s1' = do_one_step_stmt c s1 in
       Ok (c', SThen (s1', s2))
-  (* Rule Reduce-Assign *)
+  (* Rule Reduce-Assign-Var *)
   | SAssign (LEVar x, ELiteral v) when ctx_can_set_var x c ->
       let c' = ctx_update_var x v c in
       Ok (c', SPass)
+  (* Rule Reduce-Assign-Array *)
+  | SAssign (LEArraySet (LEVar x, ELiteral (Int i)), ELiteral v)
+    when ctx_can_set_array x i c ->
+      let* c' = ctx_update_array x (Z.to_int i) v c in
+      Ok (c', SPass)
   (* Rule Progress-Assign *)
-  | SAssign (LEVar x, e) ->
+  | SAssign (x, e) ->
       let* c', e' = do_one_step_expr c e in
-      Ok (c', SAssign (LEVar x, e'))
+      Ok (c', SAssign (x, e'))
   (* Rule Reduce-Cond *)
   | SCond (ELiteral (Bool b), s1, s2) -> Ok (c, if b then s1 else s2)
   (* Rule Progress-Cond *)
