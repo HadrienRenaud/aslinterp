@@ -81,13 +81,17 @@ and lexpr = LEVar of identifier
    | LESlice of lexpr * slice list
 *)
 
-and stmt = SPass | SThen of stmt * stmt | SAssign of lexpr * expr
+and stmt =
+  | SPass
+  | SThen of stmt * stmt
+  | SAssign of lexpr * expr
+  | SCond of expr * stmt * stmt
 (* Unsupported now:
    | SFuncall of string * expr list
    | SReturn of expr option
    | SAssert of expr
    | SThrow of expr option
-   | SCond of expr * stmt * stmt
+
    | SCase
    | SFor
    | SWhile

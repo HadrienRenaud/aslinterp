@@ -137,11 +137,15 @@ let rec uses_stmt = function
   | SPass -> IdSet.empty
   | SAssign (LEVar _, e) -> uses_expr e
   | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
+  | SCond (e, s1, s2) ->
+      IdSet.union (uses_expr e) @@ IdSet.union (uses_stmt s1) (uses_stmt s2)
 
 let rec defs_stmt = function
   | SPass -> IdSet.empty
   | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
   | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
+  | SCond (e, s1, s2) ->
+      IdSet.union (uses_expr e) @@ IdSet.union (defs_stmt s1) (defs_stmt s2)
 
 let ctx_expand_uses_defs s c =
   {
@@ -226,6 +230,12 @@ let rec do_one_step_stmt c s =
   | SAssign (LEVar x, e) ->
       let* c', e' = do_one_step_expr c e in
       Ok (c', SAssign (LEVar x, e'))
+  (* Rule Reduce-Cond *)
+  | SCond (ELiteral (Bool b), s1, s2) -> Ok (c, if b then s1 else s2)
+  (* Rule Progress-Cond *)
+  | SCond (e, s1, s2) ->
+      let* c', e' = do_one_step_expr c e in
+      Ok (c', SCond (e', s1, s2))
   | _ -> Error BlockedInterpretor
 
 let rec eval_stmt c s =

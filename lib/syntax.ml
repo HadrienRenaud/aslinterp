@@ -59,14 +59,17 @@ and lexpr = LEVar of identifier
    | LSetter of identifier * expr list (* As in FunCall *)
 *)
 
-and stmt = SPass | SThen of stmt * stmt | SAssign of lexpr * expr
+and stmt =
+  | SPass
+  | SThen of stmt * stmt
+  | SAssign of lexpr * expr
+  | SCond of expr * stmt * stmt
 
 (* Unsupported now:
    | SFuncall of string * expr list
    | SReturn of expr option
    | SAssert of expr
    | SThrow of expr option
-   | SCond of expr * stmt * stmt
    | SCase
    | SFor
    | SWhile
@@ -76,7 +79,10 @@ and stmt = SPass | SThen of stmt * stmt | SAssign of lexpr * expr
 *)
 and subpgm = string list * stmt
 
-let stmt_from_list = List.fold_left (fun s1 s2 -> SThen (s1, s2)) SPass
+let stmt_from_list = function
+  | [] -> SPass
+  | h :: t -> List.fold_left (fun s1 s2 -> SThen (s1, s2)) h t
+
 let is_literal = function ELiteral _ -> true | _ -> false
 
 let rec uses_expr = function
@@ -92,11 +98,15 @@ let rec uses_stmt = function
   | SPass -> IdSet.empty
   | SAssign (LEVar _, e) -> uses_expr e
   | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
+  | SCond (e, s1, s2) ->
+      IdSet.union (uses_expr e) @@ IdSet.union (uses_stmt s1) (uses_stmt s2)
 
 let rec defs_stmt = function
   | SPass -> IdSet.empty
   | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
   | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
+  | SCond (e, s1, s2) ->
+      IdSet.union (defs_expr e) @@ IdSet.union (defs_stmt s1) (defs_stmt s2)
 
 open Format
 
@@ -149,6 +159,9 @@ and pp_print_stmt f s =
       fprintf f "@[<3>%a =@ %a@]" pp_print_lexpr le pp_print_expr e
   | SThen (s1, s2) ->
       fprintf f "@[<v 0>%a ;@;%a@]" pp_print_stmt s1 pp_print_stmt s2
+  | SCond (e, s1, s2) ->
+      fprintf f "@[<3>@[<h>if@ %a@ then@]@ %a@ else@ %a@]" pp_print_expr e
+        pp_print_stmt s1 pp_print_stmt s2
 
 and pp_print_subpgm f = function
   | args, s ->
