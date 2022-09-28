@@ -1,32 +1,15 @@
 (* Prolog *)
 
-type error =
-  | DivisionByZero
-  | UnsupportedOperation of string
-  | SemanticError of string
-  | UndefinedVariable of string
-  | InterpretorError of string
-  | BlockedInterpretor
+module SC = Context.SequentialContext
 
-let pp_print_error f e =
-  match e with
-  | DivisionByZero -> Format.pp_print_string f "Division by zero"
-  | UnsupportedOperation s -> Format.fprintf f "Unsupported operation: %s" s
-  | SemanticError s -> Format.fprintf f "Semantic error: %s" s
-  | UndefinedVariable x -> Format.fprintf f "Variable %s is undefined." x
-  | InterpretorError s -> Format.fprintf f "Internal error: %s" s
-  | BlockedInterpretor -> Format.pp_print_string f "Blocked interpretor"
-
-type 'a result = ('a, error) Result.t
+type context = SC.t
 
 (********************************************************************************************)
 (* Operations *)
 
 open Syntax
 open Values
-module SC = Context.SequentialContext
-
-type context = SC.t
+open Errors
 
 let eval_binop v1 o v2 =
   match (v1, o, v2) with
@@ -115,8 +98,8 @@ let ( let* ) = Result.bind
 let rec do_one_step_expr c e =
   match e with
   (* Rule Extract-Context  *)
-  | EVar x when SC.can_use x c ->
-      let v = SC.find x c in
+  | EVar x ->
+      let* v = SC.find x c in
       Ok (c, ELiteral v)
   (* Rules Reduce-Unop-* *)
   | EUnop (o, ELiteral v) ->
@@ -160,8 +143,8 @@ let rec do_one_step_stmt c s =
       let* c', s1' = do_one_step_stmt c s1 in
       Ok (c', SThen (s1', s2))
   (* Rule Reduce-Assign *)
-  | SAssign (LEVar x, ELiteral v) when SC.can_set x c ->
-      let c' = SC.set x v c in
+  | SAssign (LEVar x, ELiteral v) ->
+      let* c' = SC.set x v c in
       Ok (c', SPass)
   (* Rule Progress-Assign *)
   | SAssign (LEVar x, e) ->

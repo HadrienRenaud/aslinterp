@@ -2,6 +2,7 @@ open Aslinterp.Values
 open Aslinterp.Syntax
 open Aslinterp.Sem
 open Aslinterp.Context
+open Aslinterp.Errors
 
 let () =
   let s =

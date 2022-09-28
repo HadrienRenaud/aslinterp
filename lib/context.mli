@@ -12,21 +12,13 @@ module type CONTEXT = sig
   val empty : t
   (** The empty context *)
 
-  val find : addr -> t -> Values.value
+  val find : addr -> t -> Values.value Errors.result
   (** Gives the value of a variable.
 
       Warning: an unbound variable will trigger a runtime error.*)
 
-  val set : addr -> Values.value -> t -> t
+  val set : addr -> Values.value -> t -> t Errors.result
   (** Binds the variable to its new value. *)
-
-  val can_use : addr -> t -> bool
-  (** Checks if the variable can be used at this time.
-
-      This includes if the variable is defined here or not. *)
-
-  val can_set : addr -> t -> bool
-  (** Checks if the varaible can be set at this time. *)
 
   val pp_print : Format.formatter -> t -> unit
   (** A formatting function for this context. *)
