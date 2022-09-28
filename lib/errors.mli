@@ -3,6 +3,7 @@ type error =
   | UnsupportedOperation of string
   | SemanticError of string
   | UndefinedVariable of string
+  | IndexOutOfBounds of string
   | InterpretorError of string
   | BlockedInterpretor
 

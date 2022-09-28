@@ -124,26 +124,53 @@ struct
     | EVar x ->
         let* v = Ctx.find x c in
         Ok (c, ELiteral v)
-    (* Rules Reduce-Unop-* *)
+    (* Rule Reduce-Unop *)
     | EUnop (o, ELiteral v) ->
         let* v' = eval_unop o v in
         Ok (c, ELiteral v')
-    (* Rules Progress-Unop-* *)
-    | EUnop (o, e') ->
-        let* c, e'' = do_one_step_expr c e' in
-        Ok (c, EUnop (o, e''))
-    (* Rules Reduce-Binop-* *)
+    (* Rule Reduce-Binop *)
     | EBinop (ELiteral v1, o, ELiteral v2) ->
         let* v = eval_binop v1 o v2 in
         Ok (c, ELiteral v)
-    (* Rules Progress-Binop-Right-* *)
+    (* Rule Reduce-Map-Access *)
+    | EMapAccess (ELiteral (Map l), ELiteral v) -> (
+        let* i =
+          match v with
+          | Int z -> Ok (IInt z)
+          | String s -> Ok (IString s)
+          | _ ->
+              Error
+                (UnsupportedOperation
+                   (Format.asprintf "Cannot index by value %a." pp_print_value v))
+        in
+        match List.assoc_opt i l with
+        | Some v' -> Ok (c, ELiteral v')
+        | None ->
+            Error
+              (IndexOutOfBounds
+                 (Format.asprintf "Index %a not defined in %a" pp_print_index i
+                    pp_print_value (Map l))))
+    (*******************)
+    (* Rule Progress-Unop *)
+    | EUnop (o, e') ->
+        let* c, e'' = do_one_step_expr c e' in
+        Ok (c, EUnop (o, e''))
+    (* Rule Progress-Binop-Right *)
     | EBinop (e1, o, e2) when not (is_literal e2) ->
         let* c, e2' = do_one_step_expr c e2 in
         Ok (c, EBinop (e1, o, e2'))
-    (* Rules Progress-Binop-Left-* *)
+    (* Rule Progress-Binop-Left *)
     | EBinop (e1, o, e2) when not (is_literal e1) ->
         let* c, e1' = do_one_step_expr c e1 in
         Ok (c, EBinop (e1', o, e2))
+    (* Rule Progress-Map-Access-left *)
+    | EMapAccess (e1, e2) when not (is_literal e1) ->
+        let* c, e1' = do_one_step_expr c e1 in
+        Ok (c, EMapAccess (e1', e2))
+    (* Rule Progress-Map-Access-Right *)
+    | EMapAccess (e1, e2) when not (is_literal e2) ->
+        let* c, e2' = do_one_step_expr c e2 in
+        Ok (c, EMapAccess (e1, e2'))
     (* Final match to guard everything.
        Should not happen, but otherwise this does not compile. *)
     | _ -> Error BlockedInterpretor
