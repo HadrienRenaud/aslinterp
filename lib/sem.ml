@@ -100,7 +100,16 @@ module type INTERPRETOR = sig
   val eval_stmt : context -> Syntax.stmt -> context Errors.result
 end
 
-module MakeInterpretor (Ctx : Context.CONTEXT) = struct
+module type SEMANTIC_DESCRIPTOR = sig
+  val semi_column_concurrent : bool
+end
+
+module SequentialSemantics = struct
+  let semi_column_concurrent = false
+end
+
+module MakeInterpretor (Ctx : Context.CONTEXT) (SD : SEMANTIC_DESCRIPTOR) =
+struct
   (********************************************************************************************)
   (* Expressions *)
   type context = Ctx.t
@@ -154,8 +163,10 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
     | SThen (SPass, s2) -> Ok (c, s2)
     (* Rule Progress-Then-Left *)
     | SThen (s1, s2) ->
-        let* c', s1' = do_one_step_stmt c s1 in
-        Ok (c', SThen (s1', s2))
+        if SD.semi_column_concurrent then raise (Failure "Not yet implemented")
+        else
+          let* c', s1' = do_one_step_stmt c s1 in
+          Ok (c', SThen (s1', s2))
     (* Rule Reduce-Assign *)
     | SAssign (LEVar x, ELiteral v) ->
         let* c' = Ctx.set x v c in
@@ -179,4 +190,5 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
     | Error e -> Error e
 end
 
-module SequentialInterpretor = MakeInterpretor (Context.SequentialContext)
+module SequentialInterpretor =
+  MakeInterpretor (Context.SequentialContext) (SequentialSemantics)

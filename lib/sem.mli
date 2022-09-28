@@ -43,7 +43,13 @@ module type INTERPRETOR = sig
     [do_one_step_stmt] transition function. *)
 end
 
-module MakeInterpretor (Ctx : Context.CONTEXT) :
+module type SEMANTIC_DESCRIPTOR = sig
+  val semi_column_concurrent : bool
+end
+
+module SequentialSemantics : SEMANTIC_DESCRIPTOR
+
+module MakeInterpretor (Ctx : Context.CONTEXT) (_ : SEMANTIC_DESCRIPTOR) :
   INTERPRETOR with type context = Ctx.t
 
 (** {Interpretors} *)
