@@ -1,4 +1,3 @@
-
 type error =
   | DivisionByZero
   | UnsupportedOperation of string

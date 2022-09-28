@@ -1,6 +1,5 @@
 module S = Syntax
 module V = Values
-
 open Errors
 
 module type CONTEXT = sig
@@ -20,10 +19,9 @@ module SequentialContext : CONTEXT = struct
   let empty = S.IdMap.empty
 
   let find x c =
-    S.IdMap.find_opt x c
-    |> Option.to_result ~none:(UndefinedVariable x)
+    S.IdMap.find_opt x c |> Option.to_result ~none:(UndefinedVariable x)
 
-  let set x v c = Ok(S.IdMap.add x v c)
+  let set x v c = Ok (S.IdMap.add x v c)
 
   let pp_print f c =
     let pp_print_var f e =

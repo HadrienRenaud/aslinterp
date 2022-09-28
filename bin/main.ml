@@ -19,7 +19,7 @@ let () =
   in
   pp_print_stmt Format.std_formatter s;
   Format.print_newline ();
-  match eval_stmt SequentialContext.empty s with
+  match SequentialInterpretor.eval_stmt SequentialContext.empty s with
   | Ok c -> SequentialContext.pp_print Format.std_formatter c
   | Error e -> pp_print_error Format.std_formatter e
 
