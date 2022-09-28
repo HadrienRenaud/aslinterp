@@ -1,126 +1,59 @@
 (** The semantics of ASL *)
 
-(** {2 Prolog} *)
-
-type error =
-  | DivisionByZero
-  | UnsupportedOperation of string
-  | SemanticError of string
-  | UndefinedVariable of string
-  | InterpretorError of string
-  | BlockedInterpretor
-
-val pp_print_error : Format.formatter -> error -> unit
-
-type 'a result = ('a, error) Result.t
-
 (** {2 Semantics of operations } *)
 
 val eval_binop :
-  Values.value -> Syntax.binop -> Values.value -> Values.value result
+  Values.value -> Syntax.binop -> Values.value -> Values.value Errors.result
 (** Evaluate an binary operation. *)
 
-val eval_unop : Syntax.unop -> Values.value -> Values.value result
+val eval_unop : Syntax.unop -> Values.value -> Values.value Errors.result
 (** Evaluate an unary operation. *)
 
-(** {2 Reduction contexts} *)
+(** {2 Interpretor functor} *)
+module type INTERPRETOR = sig
+  type context
 
-type context = {
-  v : Values.value Syntax.IdMap.t;
-      (** Maps the variable names to their values *)
-  s : Syntax.subpgm Syntax.IdMap.t;
-      (** Maps the function names to their definition *)
-  d : Syntax.IdSet.t;
-      (** For concurrent programs, [d] represents the variables that should be defined at this
-      point, but are not yet defined. You cannot either define or use variables that are in
-      [d]. *)
-  u : Syntax.IdSet.t;
-      (** For concurrent programs, [u] represents the variables that are yet to be used by the
-      program. YOu cannot redefine them until they are used. *)
-}
-(** context is the reduction environment. *)
+  (** {3 Semantics of expressions } *)
 
-val ctx_find_opt_var : Syntax.identifier -> context -> Values.value option
-(** Maps a variable name to its value in this context.
-    Returns None if the variable is not defined. *)
-
-val ctx_empty : context
-(** The empty context. *)
-
-val ctx_update_var : Syntax.identifier -> Values.value -> context -> context
-(** Add new value bind to var in a context *)
-
-(** {4 Concurrent helpers}
-
-    Those do not interfere with execution in the sequential case.
-
-    In the concurrent case, "eagerly modify" means modify in the following (in the sense of
-    [;]) of the program.
- *)
-
-val ctx_can_use_var : Syntax.identifier -> context -> bool
-(** Check if the variable can be used in the context.
-
-    Does not check if the variable is defined, only if it is not restricted in a
-    concurrent way. *)
-
-val ctx_can_set_var : Syntax.identifier -> context -> bool
-(** Check if the variable can be set in the context.
-
-    Does not check if the name is not already taken by a function nor a unsettable variable.
-*)
-
-val uses_expr : Syntax.expr -> Syntax.IdSet.t
-(** Determines what cannot be eagerly modified based on what variables this expression uses.
-*)
-
-val uses_stmt : Syntax.stmt -> Syntax.IdSet.t
-(** Determines what cannot be eagerly modified based on what variables this statement uses. *)
-
-val defs_expr : Syntax.expr -> Syntax.IdSet.t
-(** Determines what cannot be eagerly fetched from context based on what variables this
-    expression defines. *)
-
-val defs_stmt : Syntax.stmt -> Syntax.IdSet.t
-(** Determines what cannot be eagerly fetched from context based on what variables this
-    statement defines. *)
-
-val ctx_expand_uses_defs : Syntax.stmt -> context -> context
-(** Expand the context guards to take into account [s].
-    It uses [uses_stmt] and [defs_stmt]. *)
-
-val ctx_discard_uses_defs : context -> context -> context
-(** [ctx_discard_uses_defs previous modified] returns a context formed by discarding the
-    guards expanded by [ctx_expand_uses_defs], which are taken from [previous] in the result,
-    and keeping the variable parts. *)
-
-(** {4 Utilities} *)
-
-val pp_print_context : Format.formatter -> context -> unit
-(** A pretty printer *)
-
-(** {2 Semantics of expressions } *)
-
-val do_one_step_expr : context -> Syntax.expr -> (context * Syntax.expr) result
-(** A small-step transition function, that we try to keep as close as possible to the
+  val do_one_step_expr :
+    context -> Syntax.expr -> (context * Syntax.expr) Errors.result
+  (** A small-step transition function, that we try to keep as close as possible to the
     semantic rules. *)
 
-val eval_expr : context -> Syntax.expr -> (context * Values.value) result
-(** A evaluation function for expressions, that uses the function [do_one_step_expr] and take
+  val eval_expr :
+    context -> Syntax.expr -> (context * Values.value) Errors.result
+  (** A evaluation function for expressions, that uses the function [do_one_step_expr] and take
     its transitive closure. *)
 
-(** {2 Semantics of statements }
+  (** {3 Semantics of statements }
 
     Here come the real interpretor! *)
 
-val do_one_step_stmt : context -> Syntax.stmt -> (context * Syntax.stmt) result
-(** A small-step transition function which follows the semantic rules on the reduction of
+  val do_one_step_stmt :
+    context -> Syntax.stmt -> (context * Syntax.stmt) Errors.result
+  (** A small-step transition function which follows the semantic rules on the reduction of
     statements.
 
     We try to keep as close as possible to the
     semantic rules. It uses [do_one_step_expr] for the reduction of expressions, as
     specified by the semantic rules. *)
 
-val eval_stmt : context -> Syntax.stmt -> context result
-(** The interpretor in itself. It works by taking the transitive closure of the
+  val eval_stmt : context -> Syntax.stmt -> context Errors.result
+  (** The interpretor in itself. It works by taking the transitive closure of the
     [do_one_step_stmt] transition function. *)
+end
+
+(** {Interpretors} *)
+
+module type SEMANTIC_DESCRIPTOR = sig
+  val semi_column_concurrent : bool
+end
+
+module SequentialSemantics : SEMANTIC_DESCRIPTOR
+module ConcurrentSemantics : SEMANTIC_DESCRIPTOR
+
+module MakeInterpretor (Ctx : Context.CONTEXT) (_ : SEMANTIC_DESCRIPTOR) :
+  INTERPRETOR with type context = Ctx.t
+
+module SequentialInterpretor :
+  INTERPRETOR with type context = Context.SequentialContext.t

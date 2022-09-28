@@ -1,29 +1,9 @@
-(* Prolog *)
-
-type error =
-  | DivisionByZero
-  | UnsupportedOperation of string
-  | SemanticError of string
-  | UndefinedVariable of string
-  | InterpretorError of string
-  | BlockedInterpretor
-
-let pp_print_error f e =
-  match e with
-  | DivisionByZero -> Format.pp_print_string f "Division by zero"
-  | UnsupportedOperation s -> Format.fprintf f "Unsupported operation: %s" s
-  | SemanticError s -> Format.fprintf f "Semantic error: %s" s
-  | UndefinedVariable x -> Format.fprintf f "Variable %s is undefined." x
-  | InterpretorError s -> Format.fprintf f "Internal error: %s" s
-  | BlockedInterpretor -> Format.pp_print_string f "Blocked interpretor"
-
-type 'a result = ('a, error) Result.t
-
 (********************************************************************************************)
 (* Operations *)
 
 open Syntax
 open Values
+open Errors
 
 let eval_binop v1 o v2 =
   match (v1, o, v2) with
@@ -35,27 +15,27 @@ let eval_binop v1 o v2 =
   | Int x, Leq, Int y -> Ok (Bool (x <= y))
   | Int x, GT, Int y -> Ok (Bool (x > y))
   | Int x, Geq, Int y -> Ok (Bool (x >= y))
-  | Int x, Plus, Int y -> Ok (Int (x + y))
-  | Int x, Minus, Int y -> Ok (Int (x - y))
-  | Int x, Mult, Int y -> Ok (Int (x * y))
-  | Int _, DIV, Int 0 -> Error DivisionByZero
-  | Int x, DIV, Int y -> Ok (Int (x / y))
-  | Int _, MOD, Int 0 -> Error DivisionByZero
-  | Int x, MOD, Int y -> Ok (Int (x mod y))
-  | Int x, RSh, Int y -> Ok (Int (x asr y))
-  | Int x, LSh, Int y -> Ok (Int (x lsl y))
-  | Int x, Pow, Int y -> Ok (Int (int_pow x y))
+  | Int x, Plus, Int y -> Ok (Int Z.(x + y))
+  | Int x, Minus, Int y -> Ok (Int Z.(x - y))
+  | Int x, Mult, Int y -> Ok (Int Z.(x * y))
+  | Int _, DIV, Int y when y = Z.zero -> Error DivisionByZero
+  | Int x, DIV, Int y -> Ok (Int Z.(x / y))
+  | Int _, MOD, Int y when y = Z.zero -> Error DivisionByZero
+  | Int x, MOD, Int y -> Ok (Int Z.(x mod y))
+  | Int x, RSh, Int y -> Ok (Int Z.(x asr Z.to_int y))
+  | Int x, LSh, Int y -> Ok (Int Z.(x lsl Z.to_int y))
+  | Int x, Pow, Int y -> Ok (Int Z.(x ** Z.to_int y))
   (* Operations on Real *)
   | Real x, LT, Real y -> Ok (Bool (x < y))
   | Real x, Leq, Real y -> Ok (Bool (x <= y))
   | Real x, GT, Real y -> Ok (Bool (x > y))
   | Real x, Geq, Real y -> Ok (Bool (x >= y))
-  | Real x, Plus, Real y -> Ok (Real (x +. y))
-  | Real x, Minus, Real y -> Ok (Real (x -. y))
-  | Real x, Mult, Real y -> Ok (Real (x *. y))
-  | Real _, RDiv, Real 0. -> Error DivisionByZero
-  | Real x, RDiv, Real y -> Ok (Real (x /. y))
-  | Real x, Pow, Int y -> Ok (Real (x ** float_of_int y))
+  | Real x, Plus, Real y -> Ok (Real Q.(x + y))
+  | Real x, Minus, Real y -> Ok (Real Q.(x - y))
+  | Real x, Mult, Real y -> Ok (Real Q.(x * y))
+  | Real _, RDiv, Real y when y = Q.zero -> Error DivisionByZero
+  | Real x, RDiv, Real y -> Ok (Real Q.(x / y))
+  | Real x, Pow, Int y -> Ok (Real (Q.of_float (Q.to_float x ** Z.to_float y)))
   (* Operations on boolean *)
   | Bool a, BAnd, Bool b -> Ok (Bool (a && b))
   | Bool a, BOr, Bool b -> Ok (Bool (a || b))
@@ -67,22 +47,22 @@ let eval_binop v1 o v2 =
   | Bitstr s1, And, Bitstr s2 -> Ok (Bitstr (Array.map2 ( && ) s1 s2))
   | Bitstr s1, Or, Bitstr s2 -> Ok (Bitstr (Array.map2 ( || ) s1 s2))
   | Bitstr s1, Plus, Bitstr s2 ->
-      let i1 = int_of_bitstring s1 in
-      let i2 = int_of_bitstring s2 in
-      let s3 = bitstring_of_int (i1 + i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let i2 = z_of_bitstring s2 in
+      let s3 = bitstring_of_z (Z.add i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | Bitstr s1, Minus, Bitstr s2 ->
-      let i1 = int_of_bitstring s1 in
-      let i2 = int_of_bitstring s2 in
-      let s3 = bitstring_of_int (i1 - i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let i2 = z_of_bitstring s2 in
+      let s3 = bitstring_of_z (Z.sub i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | Bitstr s1, Plus, Int i2 ->
-      let i1 = int_of_bitstring s1 in
-      let s3 = bitstring_of_int (i1 + i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let s3 = bitstring_of_z (Z.add i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | Bitstr s1, Minus, Int i2 ->
-      let i1 = int_of_bitstring s1 in
-      let s3 = bitstring_of_int (i1 - i2) (Array.length s1) in
+      let i1 = z_of_bitstring s1 in
+      let s3 = bitstring_of_z (Z.sub i1 i2) (Array.length s1) in
       Ok (Bitstr s3)
   | _ ->
       Error
@@ -94,8 +74,8 @@ let eval_unop o v =
   match (o, v) with
   | UBNeg, Bool b -> Ok (Bool (not b))
   | UNot, Bitstr s -> Ok (Bitstr (Array.map not s))
-  | UMinus, Int x -> Ok (Int ~-x)
-  | UMinus, Real x -> Ok (Real ~-.x)
+  | UMinus, Int x -> Ok (Int (Z.neg x))
+  | UMinus, Real x -> Ok (Real (Q.neg x))
   | _ ->
       Error
         (UnsupportedOperation
@@ -103,144 +83,129 @@ let eval_unop o v =
               pp_print_unop o pp_print_value v))
 
 (********************************************************************************************)
-(* Contexts *)
+(* Interpretor Functor *)
 
-type context = {
-  v : Values.value IdMap.t;
-  s : Syntax.subpgm IdMap.t;
-  d : IdSet.t;
-  u : IdSet.t;
-}
+module type INTERPRETOR = sig
+  type context
 
-let ctx_find_opt_var x { v; _ } = IdMap.find_opt x v
+  val do_one_step_expr :
+    context -> Syntax.expr -> (context * Syntax.expr) Errors.result
 
-let ctx_find_res_var x c =
-  ctx_find_opt_var x c |> Option.to_result ~none:(UndefinedVariable x)
+  val eval_expr :
+    context -> Syntax.expr -> (context * Values.value) Errors.result
 
-let ctx_empty : context =
-  { v = IdMap.empty; s = IdMap.empty; d = IdSet.empty; u = IdSet.empty }
+  val do_one_step_stmt :
+    context -> Syntax.stmt -> (context * Syntax.stmt) Errors.result
 
-let ctx_update_var x v c = { c with v = IdMap.add x v c.v }
-let ctx_can_use_var x c = not @@ IdSet.mem x c.d
-let ctx_can_set_var x c = (not (IdSet.mem x c.d)) && not (IdSet.mem x c.u)
+  val eval_stmt : context -> Syntax.stmt -> context Errors.result
+end
 
-let rec uses_expr = function
-  | ELiteral _ -> IdSet.empty
-  | EVar x -> IdSet.singleton x
-  | EUnop (_, e) -> uses_expr e
-  | EBinop (e1, _, e2) -> IdSet.union (uses_expr e1) (uses_expr e2)
+module type SEMANTIC_DESCRIPTOR = sig
+  val semi_column_concurrent : bool
+end
 
-let defs_expr _ = IdSet.empty
-(* For the moment, when we will have function calls, it might get different. *)
+module SequentialSemantics = struct
+  let semi_column_concurrent = false
+end
 
-let rec uses_stmt = function
-  | SPass -> IdSet.empty
-  | SAssign (LEVar _, e) -> uses_expr e
-  | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
+module ConcurrentSemantics = struct
+  let semi_column_concurrent = true
+end
 
-let rec defs_stmt = function
-  | SPass -> IdSet.empty
-  | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
-  | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
+module MakeInterpretor (Ctx : Context.CONTEXT) (SD : SEMANTIC_DESCRIPTOR) =
+struct
+  (********************************************************************************************)
+  (* Expressions *)
+  type context = Ctx.t
 
-let ctx_expand_uses_defs s c =
-  {
-    v = c.v;
-    s = c.s;
-    u = IdSet.union c.u (uses_stmt s);
-    d = IdSet.union c.d (defs_stmt s);
-  }
+  open Syntax
 
-let ctx_discard_uses_defs { d; u; _ } { v; s; _ } = { d; u; v; s }
+  let ( let* ) = Result.bind
 
-let pp_print_context f c =
-  let pp_print_var f e =
-    let x, v = e in
-    Format.fprintf f "@[<2>\"%s\":@ %a@]" x pp_print_value v
-  in
-  Format.fprintf f "@[<hv 2>{ %a@] }"
-    (Format.pp_print_seq
-       ~pp_sep:(fun f () -> Format.fprintf f ",@ ")
-       pp_print_var)
-    (IdMap.to_seq c.v)
+  let rec do_one_step_expr c e =
+    match e with
+    (* Rule Extract-Context  *)
+    | EVar x ->
+        let* v = Ctx.find x c in
+        Ok (c, ELiteral v)
+    (* Rules Reduce-Unop-* *)
+    | EUnop (o, ELiteral v) ->
+        let* v' = eval_unop o v in
+        Ok (c, ELiteral v')
+    (* Rules Progress-Unop-* *)
+    | EUnop (o, e') ->
+        let* c, e'' = do_one_step_expr c e' in
+        Ok (c, EUnop (o, e''))
+    (* Rules Reduce-Binop-* *)
+    | EBinop (ELiteral v1, o, ELiteral v2) ->
+        let* v = eval_binop v1 o v2 in
+        Ok (c, ELiteral v)
+    (* Rules Progress-Binop-Right-* *)
+    | EBinop (e1, o, e2) when not (is_literal e2) ->
+        let* c, e2' = do_one_step_expr c e2 in
+        Ok (c, EBinop (e1, o, e2'))
+    (* Rules Progress-Binop-Left-* *)
+    | EBinop (e1, o, e2) when not (is_literal e1) ->
+        let* c, e1' = do_one_step_expr c e1 in
+        Ok (c, EBinop (e1', o, e2))
+    (* Final match to guard everything.
+       Should not happen, but otherwise this does not compile. *)
+    | _ -> Error BlockedInterpretor
 
-(********************************************************************************************)
-(* Expressions *)
+  let rec eval_expr c e =
+    match do_one_step_expr c e with
+    | Ok (c', ELiteral v) -> Ok (c', v)
+    | Ok (c', e') -> eval_expr c' e'
+    | Error err -> Error err
 
-open Syntax
+  (********************************************************************************************)
+  (* Statements *)
 
-let ( let* ) = Result.bind
-
-let rec do_one_step_expr c e =
-  match e with
-  (* Rule Extract-Context  *)
-  | EVar x when ctx_can_use_var x c ->
-      let* v = ctx_find_res_var x c in
-      Ok (c, ELiteral v)
-  (* Rules Reduce-Unop-* *)
-  | EUnop (o, ELiteral v) ->
-      let* v' = eval_unop o v in
-      Ok (c, ELiteral v')
-  (* Rules Progress-Unop-* *)
-  | EUnop (o, e') ->
-      let* c, e'' = do_one_step_expr c e' in
-      Ok (c, EUnop (o, e''))
-  (* Rules Reduce-Binop-* *)
-  | EBinop (ELiteral v1, o, ELiteral v2) ->
-      let* v = eval_binop v1 o v2 in
-      Ok (c, ELiteral v)
-  (* Rules Progress-Binop-Right-* *)
-  | EBinop (e1, o, e2) when not (is_literal e2) ->
-      let* c, e2' = do_one_step_expr c e2 in
-      Ok (c, EBinop (e1, o, e2'))
-  (* Rules Progress-Binop-Left-* *)
-  | EBinop (e1, o, e2) when not (is_literal e1) ->
-      let* c, e1' = do_one_step_expr c e1 in
-      Ok (c, EBinop (e1', o, e2))
-  (* Final match to guard everything.
-     Should not happen, but otherwise this does not compile. *)
-  | _ -> Error BlockedInterpretor
-
-let rec eval_expr c e =
-  match do_one_step_expr c e with
-  | Ok (c', ELiteral v) -> Ok (c', v)
-  | Ok (c', e') -> eval_expr c' e'
-  | Error err -> Error err
-
-(********************************************************************************************)
-(* Statements *)
-
-let rec do_one_step_stmt c s =
-  match s with
-  (* Rule Reduce-Then-Left *)
-  | SThen (SPass, s2) -> Ok (c, s2)
-  (* Rule Reduce-Assign *)
-  | SAssign (LEVar x, ELiteral v) when ctx_can_set_var x c ->
-      let c' = ctx_update_var x v c in
-      Ok (c', SPass)
-  (* Rule Progress-Assign *)
-  | SAssign (LEVar x, e) ->
-      let* c', e' = do_one_step_expr c e in
-      Ok (c', SAssign (LEVar x, e'))
-  (* Rules Progress-Then-* *)
-  | SThen (s1, s2) -> (
-      let cr = ctx_expand_uses_defs s1 c in
-      match do_one_step_stmt cr s2 with
-      (* If a reduction happened on the right *)
-      | Ok (cr', s2') ->
-          let c' = ctx_discard_uses_defs c cr' in
-          Ok (c', SThen (s1, s2'))
-      (* If no reduction could happen on the right, we are backtracking *)
-      | Error BlockedInterpretor ->
+  let rec do_one_step_stmt c s =
+    match s with
+    (* Rule Reduce-Then-Left *)
+    | SThen (SPass, s2) -> Ok (c, s2)
+    (* Rules Progress-Then-* *)
+    | SThen (s1, s2) ->
+        if SD.semi_column_concurrent then
+          let cr = c in
+          match do_one_step_stmt cr s2 with
+          (* If a reduction happened on the right *)
+          | Ok (cr', s2') ->
+              let c' = cr' in
+              Ok (c', SThen (s1, s2'))
+          (* If no reduction could happen on the right, we are backtracking *)
+          | Error BlockedInterpretor ->
+              let* c', s1' = do_one_step_stmt c s1 in
+              Ok (c', SThen (s1', s2))
+          (* If an other error happened, we propagate the error.
+             TODO: should we execute on the left first? *)
+          | Error err -> Error err
+        else
           let* c', s1' = do_one_step_stmt c s1 in
           Ok (c', SThen (s1', s2))
-      (* If an other error happened, we propagate the error.
-         TODO: should we execute on the left first? *)
-      | Error err -> Error err)
-  | _ -> Error BlockedInterpretor
+    (* Rule Reduce-Assign *)
+    | SAssign (LEVar x, ELiteral v) ->
+        let* c' = Ctx.set x v c in
+        Ok (c', SPass)
+    (* Rule Progress-Assign *)
+    | SAssign (LEVar x, e) ->
+        let* c', e' = do_one_step_expr c e in
+        Ok (c', SAssign (LEVar x, e'))
+    (* Rule Reduce-Cond *)
+    | SCond (ELiteral (Bool b), s1, s2) -> Ok (c, if b then s1 else s2)
+    (* Rule Progress-Cond *)
+    | SCond (e, s1, s2) ->
+        let* c', e' = do_one_step_expr c e in
+        Ok (c', SCond (e', s1, s2))
+    | _ -> Error BlockedInterpretor
 
-let rec eval_stmt c s =
-  match do_one_step_stmt c s with
-  | Ok (c', SPass) -> Ok c'
-  | Ok (c', s') -> eval_stmt c' s'
-  | Error e -> Error e
+  let rec eval_stmt c s =
+    match do_one_step_stmt c s with
+    | Ok (c', SPass) -> Ok c'
+    | Ok (c', s') -> eval_stmt c' s'
+    | Error e -> Error e
+end
+
+module SequentialInterpretor =
+  MakeInterpretor (Context.SequentialContext) (SequentialSemantics)

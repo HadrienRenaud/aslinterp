@@ -18,7 +18,7 @@
 (package
  (name aslinterp)
  (synopsis "A small but functionnal interpretor for ASL")
- (depends ocaml dune)
+ (depends ocaml dune zarith alcotest)
  (tags
   (topics asl ocaml interpretor)))
 
