@@ -50,7 +50,7 @@ type expr =
    | EStruct of (string * expr) list
 *)
 
-and lexpr = LEVar of identifier
+and lexpr = LEVar of identifier | LEMapWrite of identifier * expr
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier
@@ -128,9 +128,12 @@ let rec pp_print_expr f e =
   | EVar x -> pp_print_string f x
   | ELiteral v -> Values.pp_print_value f v
   | EMapAccess (e1, e2) ->
-      fprintf f "@[<2>%a[@,%a@;<0 -2>@]" pp_print_expr e1 pp_print_expr e2
+      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_expr e1 pp_print_expr e2
 
-and pp_print_lexpr f e = match e with LEVar x -> pp_print_string f x
+and pp_print_lexpr f e =
+  match e with
+  | LEVar x -> pp_print_string f x
+  | LEMapWrite (x, e) -> fprintf f "@[<2>%s[@,%a@;<0 -2>]@]" x pp_print_expr e
 
 and pp_print_stmt f s =
   match s with

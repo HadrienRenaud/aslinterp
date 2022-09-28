@@ -118,6 +118,22 @@ struct
 
   let ( let* ) = Result.bind
 
+  let value_to_index v =
+    match v with
+    | Int z -> Ok (IInt z)
+    | String s -> Ok (IString s)
+    | _ ->
+        Error
+          (UnsupportedOperation
+             (Format.asprintf "Cannot index by value %a." pp_print_value v))
+
+  let unpack_map = function
+    | Map a -> Ok a
+    | v ->
+        Error
+          (UnsupportedOperation
+             (Format.asprintf "Cannot index %a" pp_print_value v))
+
   let rec do_one_step_expr c e =
     match e with
     (* Rule Extract-Context  *)
@@ -134,15 +150,7 @@ struct
         Ok (c, ELiteral v)
     (* Rule Reduce-Map-Access *)
     | EMapAccess (ELiteral (Map l), ELiteral v) -> (
-        let* i =
-          match v with
-          | Int z -> Ok (IInt z)
-          | String s -> Ok (IString s)
-          | _ ->
-              Error
-                (UnsupportedOperation
-                   (Format.asprintf "Cannot index by value %a." pp_print_value v))
-        in
+        let* i = value_to_index v in
         match List.assoc_opt i l with
         | Some v' -> Ok (c, ELiteral v')
         | None ->
@@ -198,10 +206,18 @@ struct
     | SAssign (LEVar x, ELiteral v) ->
         let* c' = Ctx.set x v c in
         Ok (c', SPass)
+    (* Rule Reduce-Map-Write *)
+    | SAssign (LEMapWrite (x, ELiteral v1), ELiteral v2) ->
+        let* i = value_to_index v1 in
+        let* ma = Ctx.find x c in
+        let* a = unpack_map ma in
+        let a' = (i, v2) :: List.remove_assoc i a in
+        let* c' = Ctx.set x (Map a') c in
+        Ok (c', SPass)
     (* Rule Progress-Assign *)
-    | SAssign (LEVar x, e) ->
+    | SAssign (x, e) when not (is_literal e) ->
         let* c', e' = do_one_step_expr c e in
-        Ok (c', SAssign (LEVar x, e'))
+        Ok (c', SAssign (x, e'))
     (* Rule Reduce-Cond *)
     | SCond (ELiteral (Bool b), s1, s2) -> Ok (c, if b then s1 else s2)
     (* Rule Progress-Cond *)

@@ -35,7 +35,7 @@ and pp_print_value f v =
   | Map l ->
       F.fprintf f "@[<hv 2>[ %a ]@]"
         (F.pp_print_list
-           ~pp_sep:(fun f () -> F.fprintf f ", @")
+           ~pp_sep:(fun f () -> F.fprintf f ",@ ")
            pp_print_map_element)
         l
 
