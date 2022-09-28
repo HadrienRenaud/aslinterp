@@ -1,6 +1,7 @@
 open Aslinterp.Values
 open Aslinterp.Syntax
 open Aslinterp.Sem
+open Aslinterp.Context
 
 let () =
   let s =
@@ -17,8 +18,8 @@ let () =
   in
   pp_print_stmt Format.std_formatter s;
   Format.print_newline ();
-  match eval_stmt ctx_empty s with
-  | Ok c -> pp_print_context Format.std_formatter c
+  match eval_stmt SequentialContext.empty s with
+  | Ok c -> SequentialContext.pp_print Format.std_formatter c
   | Error e -> pp_print_error Format.std_formatter e
 
 let () = Format.print_newline ()

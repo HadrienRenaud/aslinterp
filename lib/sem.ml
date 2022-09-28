@@ -24,6 +24,9 @@ type 'a result = ('a, error) Result.t
 
 open Syntax
 open Values
+module SC = Context.SequentialContext
+
+type context = SC.t
 
 let eval_binop v1 o v2 =
   match (v1, o, v2) with
@@ -103,72 +106,6 @@ let eval_unop o v =
               pp_print_unop o pp_print_value v))
 
 (********************************************************************************************)
-(* Contexts *)
-
-type context = {
-  v : Values.value IdMap.t;
-  s : Syntax.subpgm IdMap.t;
-  d : IdSet.t;
-  u : IdSet.t;
-}
-
-let ctx_find_opt_var x { v; _ } = IdMap.find_opt x v
-
-let ctx_find_res_var x c =
-  ctx_find_opt_var x c |> Option.to_result ~none:(UndefinedVariable x)
-
-let ctx_empty : context =
-  { v = IdMap.empty; s = IdMap.empty; d = IdSet.empty; u = IdSet.empty }
-
-let ctx_update_var x v c = { c with v = IdMap.add x v c.v }
-let ctx_can_use_var x c = not @@ IdSet.mem x c.d
-let ctx_can_set_var x c = (not (IdSet.mem x c.d)) && not (IdSet.mem x c.u)
-
-let rec uses_expr = function
-  | ELiteral _ -> IdSet.empty
-  | EVar x -> IdSet.singleton x
-  | EUnop (_, e) -> uses_expr e
-  | EBinop (e1, _, e2) -> IdSet.union (uses_expr e1) (uses_expr e2)
-
-let defs_expr _ = IdSet.empty
-(* For the moment, when we will have function calls, it might get different. *)
-
-let rec uses_stmt = function
-  | SPass -> IdSet.empty
-  | SAssign (LEVar _, e) -> uses_expr e
-  | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
-  | SCond (e, s1, s2) ->
-      IdSet.union (uses_expr e) @@ IdSet.union (uses_stmt s1) (uses_stmt s2)
-
-let rec defs_stmt = function
-  | SPass -> IdSet.empty
-  | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
-  | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
-  | SCond (e, s1, s2) ->
-      IdSet.union (uses_expr e) @@ IdSet.union (defs_stmt s1) (defs_stmt s2)
-
-let ctx_expand_uses_defs s c =
-  {
-    v = c.v;
-    s = c.s;
-    u = IdSet.union c.u (uses_stmt s);
-    d = IdSet.union c.d (defs_stmt s);
-  }
-
-let ctx_discard_uses_defs { d; u; _ } { v; s; _ } = { d; u; v; s }
-
-let pp_print_context f c =
-  let pp_print_var f e =
-    let x, v = e in
-    Format.fprintf f "@[<2>\"%s\":@ %a@]" x pp_print_value v
-  in
-  Format.fprintf f "@[<hv 2>{ %a@] }"
-    (Format.pp_print_seq
-       ~pp_sep:(fun f () -> Format.fprintf f ",@ ")
-       pp_print_var)
-    (IdMap.to_seq c.v)
-
-(********************************************************************************************)
 (* Expressions *)
 
 open Syntax
@@ -178,8 +115,8 @@ let ( let* ) = Result.bind
 let rec do_one_step_expr c e =
   match e with
   (* Rule Extract-Context  *)
-  | EVar x when ctx_can_use_var x c ->
-      let* v = ctx_find_res_var x c in
+  | EVar x when SC.can_use x c ->
+      let v = SC.find x c in
       Ok (c, ELiteral v)
   (* Rules Reduce-Unop-* *)
   | EUnop (o, ELiteral v) ->
@@ -223,8 +160,8 @@ let rec do_one_step_stmt c s =
       let* c', s1' = do_one_step_stmt c s1 in
       Ok (c', SThen (s1', s2))
   (* Rule Reduce-Assign *)
-  | SAssign (LEVar x, ELiteral v) when ctx_can_set_var x c ->
-      let c' = ctx_update_var x v c in
+  | SAssign (LEVar x, ELiteral v) when SC.can_set x c ->
+      let c' = SC.set x v c in
       Ok (c', SPass)
   (* Rule Progress-Assign *)
   | SAssign (LEVar x, e) ->
