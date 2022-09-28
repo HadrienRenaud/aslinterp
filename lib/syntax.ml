@@ -85,29 +85,6 @@ let stmt_from_list = function
 
 let is_literal = function ELiteral _ -> true | _ -> false
 
-let rec uses_expr = function
-  | ELiteral _ -> IdSet.empty
-  | EVar x -> IdSet.singleton x
-  | EUnop (_, e) -> uses_expr e
-  | EBinop (e1, _, e2) -> IdSet.union (uses_expr e1) (uses_expr e2)
-
-let defs_expr _ = IdSet.empty
-(* For the moment, when we will have function calls, it might get different. *)
-
-let rec uses_stmt = function
-  | SPass -> IdSet.empty
-  | SAssign (LEVar _, e) -> uses_expr e
-  | SThen (s1, s2) -> IdSet.union (uses_stmt s1) (uses_stmt s2)
-  | SCond (e, s1, s2) ->
-      IdSet.union (uses_expr e) @@ IdSet.union (uses_stmt s1) (uses_stmt s2)
-
-let rec defs_stmt = function
-  | SPass -> IdSet.empty
-  | SAssign (LEVar x, e) -> IdSet.add x (defs_expr e)
-  | SThen (s1, s2) -> IdSet.union (defs_stmt s1) (defs_stmt s2)
-  | SCond (e, s1, s2) ->
-      IdSet.union (defs_expr e) @@ IdSet.union (defs_stmt s1) (defs_stmt s2)
-
 open Format
 
 let pp_print_binop f (b : binop) =
