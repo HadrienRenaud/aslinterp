@@ -1,6 +1,6 @@
 type bitstring = bool array
-type indexes = IInt of Z.t | IString of string
-type 'a map = (indexes * 'a) list
+type index = IInt of Z.t | IString of string
+type 'a map = (index * 'a) list
 
 type value =
   | Bitstr of bitstring
@@ -14,13 +14,13 @@ module F = Format
 
 let pp_print_bit f b = F.pp_print_int f (if b then 1 else 0)
 
-let pp_print_indexes f i =
+let pp_print_index f i =
   match i with
   | IInt z -> Z.pp_print f z
   | IString s -> F.fprintf f "@[<h>'%s'@]" s
 
 let rec pp_print_map_element f = function
-  | i, v -> F.fprintf f "@[<h>%a:@ %a@]" pp_print_indexes i pp_print_value v
+  | i, v -> F.fprintf f "@[<h>%a:@ %a@]" pp_print_index i pp_print_value v
 
 and pp_print_value f v =
   match v with

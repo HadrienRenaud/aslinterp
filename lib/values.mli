@@ -1,9 +1,9 @@
 type bitstring = bool array
 
 (** Type of indexing values, either in ASL tuples, ASL arrays or ASL structures. *)
-type indexes = IInt of Z.t | IString of string
+type index = IInt of Z.t | IString of string
 
-type 'a map = (indexes * 'a) list
+type 'a map = (index * 'a) list
 (** Underlying object behind a Map. It is for now an association list. *)
 
 (** Values in CoreASL, ie values from ASL, where compound values are mapped to Map. *)
@@ -16,6 +16,7 @@ type value =
   | String of string  (** Strings *)
   | Map of value map  (** Maps *)
 
+val pp_print_index : Format.formatter -> index -> unit
 val pp_print_value : Format.formatter -> value -> unit
 val bitstring_of_z : Z.t -> int -> bitstring
 val z_of_bitstring : bitstring -> Z.t
