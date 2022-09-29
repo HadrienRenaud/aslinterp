@@ -34,3 +34,15 @@ module SequentialContext : CONTEXT = struct
          pp_print_var)
       (S.IdMap.to_seq c)
 end
+
+module Logger (Ctx : CONTEXT) = struct
+  include Ctx
+
+  let find x c =
+    Format.eprintf "Using %s@\n" x;
+    Ctx.find x c
+
+  let set x v c =
+    Format.eprintf "Setting %s@\n" x;
+    Ctx.set x v c
+end

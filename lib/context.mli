@@ -29,3 +29,5 @@ end
 
 module SequentialContext : CONTEXT
 (** The normal sequential context. *)
+
+module Logger (Ctx : CONTEXT) : CONTEXT with type t = Ctx.t

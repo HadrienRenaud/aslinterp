@@ -234,4 +234,5 @@ struct
 end
 
 module SequentialInterpretor =
-  MakeInterpretor (Context.SequentialContext) (SequentialSemantics)
+  MakeInterpretor
+    (Context.Logger (Context.SequentialContext)) (SequentialSemantics)
