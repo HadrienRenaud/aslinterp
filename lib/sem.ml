@@ -118,6 +118,26 @@ struct
 
   let ( let* ) = Result.bind
 
+  let rec is_map_literal = function
+    | EVar _ -> true
+    | EMapAccess (e1, ELiteral _) -> is_map_literal e1
+    | _ -> false
+
+  let rec exp_to_little_endian = function
+    | EVar x -> Ok (x, [])
+    | EMapAccess (e1, ELiteral vi) ->
+        let* i = value_to_index vi in
+        let* x, rev_addr_e1 = exp_to_little_endian e1 in
+        Ok (x, i :: rev_addr_e1)
+    | _ ->
+        Error
+          (InterpretorError
+             "Cannot transform expr into address: Not fully reduced.")
+
+  let exp_to_big_endian e =
+    let* x, rev_addr = exp_to_little_endian e in
+    Ok (x, List.rev rev_addr)
+
   let rec do_one_step_expr c e =
     match e with
     (* Rule Extract-Context  *)
@@ -133,6 +153,11 @@ struct
         let* v = eval_binop v1 o v2 in
         Ok (c, ELiteral v)
     (* Rule Reduce-Map-Access *)
+    | _ when is_map_literal e ->
+        let* x, addr = exp_to_big_endian e in
+        let* v' = Ctx.find x addr c in
+        Ok (c, ELiteral v')
+    (* Rule Reduce-Map-Access-Literal *)
     | EMapAccess (ELiteral va, ELiteral vi) ->
         let* i = value_to_index vi in
         let* v' = find_address_in_value va [ i ] in
@@ -151,7 +176,8 @@ struct
         let* c, e1' = do_one_step_expr c e1 in
         Ok (c, EBinop (e1', o, e2))
     (* Rule Progress-Map-Access-left *)
-    | EMapAccess (e1, e2) when not (is_literal e1) ->
+    | EMapAccess (e1, e2) when (not (is_map_literal e1)) && not (is_literal e1)
+      ->
         let* c, e1' = do_one_step_expr c e1 in
         Ok (c, EMapAccess (e1', e2))
     (* Rule Progress-Map-Access-Right *)
