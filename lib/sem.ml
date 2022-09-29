@@ -138,7 +138,7 @@ struct
     match e with
     (* Rule Extract-Context  *)
     | EVar x ->
-        let* v = Ctx.find x c in
+        let* v = Ctx.find x [] c in
         Ok (c, ELiteral v)
     (* Rule Reduce-Unop *)
     | EUnop (o, ELiteral v) ->
@@ -204,15 +204,15 @@ struct
           Ok (c', SThen (s1', s2))
     (* Rule Reduce-Assign *)
     | SAssign (LEVar x, ELiteral v) ->
-        let* c' = Ctx.set x v c in
+        let* c' = Ctx.set x [] v c in
         Ok (c', SPass)
     (* Rule Reduce-Map-Write *)
     | SAssign (LEMapWrite (x, ELiteral v1), ELiteral v2) ->
         let* i = value_to_index v1 in
-        let* ma = Ctx.find x c in
+        let* ma = Ctx.find x [] c in
         let* a = unpack_map ma in
         let a' = (i, v2) :: List.remove_assoc i a in
-        let* c' = Ctx.set x (Map a') c in
+        let* c' = Ctx.set x [] (Map a') c in
         Ok (c', SPass)
     (* Rule Progress-Assign *)
     | SAssign (x, e) when not (is_literal e) ->
