@@ -147,3 +147,4 @@ val pp_print_expr : Format.formatter -> expr -> unit
 val pp_print_lexpr : Format.formatter -> lexpr -> unit
 val pp_print_stmt : Format.formatter -> stmt -> unit
 val pp_print_subpgm : Format.formatter -> subpgm -> unit
+val pp_print_address : Format.formatter -> address -> unit
