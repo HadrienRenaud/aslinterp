@@ -94,7 +94,17 @@ module Addresses = struct
         Error
           (UnsupportedOperation
              (Format.asprintf "Cannot index %a." pp_print_value v))
+
+  let value_to_index v =
+    match v with
+    | Int z -> Ok (IInt z)
+    | String s -> Ok (IString s)
+    | _ ->
+        Error
+          (UnsupportedOperation
+             (Format.asprintf "Cannot index by value %a." pp_print_value v))
 end
 
 let find_address_in_value = Addresses.find_address_in_value
 let set_address_in_value = Addresses.set_address_in_value
+let value_to_index = Addresses.value_to_index

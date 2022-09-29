@@ -118,22 +118,6 @@ struct
 
   let ( let* ) = Result.bind
 
-  let value_to_index v =
-    match v with
-    | Int z -> Ok (IInt z)
-    | String s -> Ok (IString s)
-    | _ ->
-        Error
-          (UnsupportedOperation
-             (Format.asprintf "Cannot index by value %a." pp_print_value v))
-
-  let unpack_map = function
-    | Map a -> Ok a
-    | v ->
-        Error
-          (UnsupportedOperation
-             (Format.asprintf "Cannot index %a" pp_print_value v))
-
   let rec do_one_step_expr c e =
     match e with
     (* Rule Extract-Context  *)
@@ -149,15 +133,10 @@ struct
         let* v = eval_binop v1 o v2 in
         Ok (c, ELiteral v)
     (* Rule Reduce-Map-Access *)
-    | EMapAccess (ELiteral (Map l), ELiteral v) -> (
-        let* i = value_to_index v in
-        match List.assoc_opt i l with
-        | Some v' -> Ok (c, ELiteral v')
-        | None ->
-            Error
-              (IndexOutOfBounds
-                 (Format.asprintf "Index %a not defined in %a" pp_print_index i
-                    pp_print_value (Map l))))
+    | EMapAccess (ELiteral va, ELiteral vi) ->
+        let* i = value_to_index vi in
+        let* v' = find_address_in_value va [ i ] in
+        Ok (c, ELiteral v')
     (*******************)
     (* Rule Progress-Unop *)
     | EUnop (o, e') ->
@@ -207,12 +186,9 @@ struct
         let* c' = Ctx.set x [] v c in
         Ok (c', SPass)
     (* Rule Reduce-Map-Write *)
-    | SAssign (LEMapWrite (x, ELiteral v1), ELiteral v2) ->
-        let* i = value_to_index v1 in
-        let* ma = Ctx.find x [] c in
-        let* a = unpack_map ma in
-        let a' = (i, v2) :: List.remove_assoc i a in
-        let* c' = Ctx.set x [] (Map a') c in
+    | SAssign (LEMapWrite (x, ELiteral vi), ELiteral v2) ->
+        let* i = value_to_index vi in
+        let* c' = Ctx.set x [ i ] v2 c in
         Ok (c', SPass)
     (* Rule Progress-Assign *)
     | SAssign (x, e) when not (is_literal e) ->

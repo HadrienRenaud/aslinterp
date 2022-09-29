@@ -25,6 +25,9 @@ val find_address_in_value : value -> address -> value Errors.result
 val set_address_in_value : value -> address -> value -> value Errors.result
 (** [set_address_in_value obj addr new_value] returns [obj] with [new_value] referenced by [addr]. *)
 
+val value_to_index : value -> index Errors.result
+(** Transform a value into an index, or an [Errors.UnsupportedOperation] if neither an int or a string. *)
+
 val pp_print_index : Format.formatter -> index -> unit
 val pp_print_value : Format.formatter -> value -> unit
 val pp_print_address : Format.formatter -> address -> unit
