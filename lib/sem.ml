@@ -211,10 +211,6 @@ struct
         else
           let* c', s1' = do_one_step_stmt c s1 in
           Ok (c', SThen (s1', s2))
-    (* Rule Reduce-Assign *)
-    | SAssign (LEVar x, ELiteral v) ->
-        let* c' = Ctx.set x [] v c in
-        Ok (c', SPass)
     (* Rule Reduce-Map-Write *)
     | SAssign (le, ELiteral v2) when is_lexpr_literal le ->
         let* x, addr = lexpr_to_big_endian le in
