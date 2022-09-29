@@ -53,3 +53,5 @@ let z_of_bitstring s =
 let make_int x = Int (Z.of_int x)
 let make_real x = Real (Q.of_float x)
 let make_bitstring x l = Bitstr (bitstring_of_z (Z.of_int x) l)
+let make_array l = Map (List.mapi (fun i x -> (IInt (Z.of_int i), x)) l)
+
