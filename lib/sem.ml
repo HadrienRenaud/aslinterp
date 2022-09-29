@@ -88,8 +88,7 @@ let eval_unop o v =
 module type INTERPRETOR = sig
   type context
 
-  val do_one_step_expr :
-    context -> Syntax.expr -> (context * Syntax.expr) Errors.result
+  val do_one_step_expr : context -> expr -> (context * expr) result
 
   val eval_expr :
     context -> Syntax.expr -> (context * Values.value) Errors.result
@@ -114,8 +113,6 @@ struct
   (* Expressions *)
   type context = Ctx.t
 
-  open Syntax
-
   let ( let* ) = Result.bind
 
   let value_to_index v =
@@ -127,18 +124,13 @@ struct
           (UnsupportedOperation
              (Format.asprintf "Cannot index by value %a." pp_print_value v))
 
-  let unpack_map = function
-    | Map a -> Ok a
-    | v ->
-        Error
-          (UnsupportedOperation
-             (Format.asprintf "Cannot index %a" pp_print_value v))
-
   let rec do_one_step_expr c e =
     match e with
     (* Rule Extract-Context  *)
-    | EVar x ->
-        let* v = Ctx.find x c in
+    | EVar x -> Ok (c, EGetAddress (x, []))
+    (* Rule Extract-Address *)
+    | EGetAddress (x, addr) ->
+        let* v = Ctx.find x addr c in
         Ok (c, ELiteral v)
     (* Rule Reduce-Unop *)
     | EUnop (o, ELiteral v) ->
@@ -158,6 +150,13 @@ struct
               (IndexOutOfBounds
                  (Format.asprintf "Index %a not defined in %a" pp_print_index i
                     pp_print_value (Map l))))
+    (* | EMapAccess (EVar x, ELiteral v) ->
+        let* i = value_to_index v in
+        Ok (c, EGetAddress (x, [ i ])) *)
+    | EMapAccess (EGetAddress (x, addr), ELiteral v) ->
+        let* i = value_to_index v in
+        let addr' = List.append addr [ i ] in
+        Ok (c, EGetAddress (x, addr'))
     (*******************)
     (* Rule Progress-Unop *)
     | EUnop (o, e') ->
@@ -172,7 +171,8 @@ struct
         let* c, e1' = do_one_step_expr c e1 in
         Ok (c, EBinop (e1', o, e2))
     (* Rule Progress-Map-Access-left *)
-    | EMapAccess (e1, e2) when not (is_literal e1) ->
+    | EMapAccess (e1, e2) when (not (is_literal e1)) && not (expr_is_address e1)
+      ->
         let* c, e1' = do_one_step_expr c e1 in
         Ok (c, EMapAccess (e1', e2))
     (* Rule Progress-Map-Access-Right *)
@@ -192,6 +192,21 @@ struct
   (********************************************************************************************)
   (* Statements *)
 
+  let rec do_one_step_lexpr c le =
+    match le with
+    | LEVar x -> Ok (c, LEAddress (x, []))
+    | LEMapWrite (LEAddress (x, addr), ELiteral v) ->
+        let* i = value_to_index v in
+        let addr' = addr @ [ i ] in
+        Ok (c, LEAddress (x, addr'))
+    | LEMapWrite (le', e) when not (is_literal e) ->
+        let* c', e' = do_one_step_expr c e in
+        Ok (c', LEMapWrite (le', e'))
+    | LEMapWrite (le', e) when not (Syntax.lexpr_is_address le') ->
+        let* c', le'' = do_one_step_lexpr c le' in
+        Ok (c', LEMapWrite (le'', e))
+    | _ -> Error BlockedInterpretor
+
   let rec do_one_step_stmt c s =
     match s with
     (* Rule Reduce-Then-Left *)
@@ -202,22 +217,18 @@ struct
         else
           let* c', s1' = do_one_step_stmt c s1 in
           Ok (c', SThen (s1', s2))
-    (* Rule Reduce-Assign *)
-    | SAssign (LEVar x, ELiteral v) ->
-        let* c' = Ctx.set x v c in
-        Ok (c', SPass)
-    (* Rule Reduce-Map-Write *)
-    | SAssign (LEMapWrite (x, ELiteral v1), ELiteral v2) ->
-        let* i = value_to_index v1 in
-        let* ma = Ctx.find x c in
-        let* a = unpack_map ma in
-        let a' = (i, v2) :: List.remove_assoc i a in
-        let* c' = Ctx.set x (Map a') c in
-        Ok (c', SPass)
-    (* Rule Progress-Assign *)
+    (* Rule Progress-Assign-Left *)
+    | SAssign (le, e) when not (Syntax.lexpr_is_address le) ->
+        let* c', le' = do_one_step_lexpr c le in
+        Ok (c', SAssign (le', e))
+    (* Rule Progress-Assign-Right *)
     | SAssign (x, e) when not (is_literal e) ->
         let* c', e' = do_one_step_expr c e in
         Ok (c', SAssign (x, e'))
+    (* Rule Reduce-Assign *)
+    | SAssign (LEAddress (x, addr), ELiteral v) ->
+        let* c' = Ctx.set x addr v c in
+        Ok (c', SPass)
     (* Rule Reduce-Cond *)
     | SCond (ELiteral (Bool b), s1, s2) -> Ok (c, if b then s1 else s2)
     (* Rule Progress-Cond *)

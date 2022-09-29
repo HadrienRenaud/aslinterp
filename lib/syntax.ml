@@ -1,3 +1,6 @@
+module V = Values
+open Errors
+
 type binop =
   | BAnd  (** [&&] *)
   | BOr  (** [||] *)
@@ -25,16 +28,18 @@ type binop =
 
 type unop = UMinus  (** [-] *) | UBNeg  (** [!] *) | UNot  (** [NOT] *)
 type identifier = string
+type address = V.index list
 
 module IdMap = Map.Make (String)
 module IdSet = Set.Make (String)
 
 type expr =
-  | ELiteral of Values.value  (** A direct value *)
+  | ELiteral of V.value  (** A direct value *)
   | EVar of identifier  (** A variable *)
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
   | EMapAccess of expr * expr  (** e1[e2] *)
+  | EGetAddress of identifier * address  (** e1[addr] *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)
@@ -50,7 +55,10 @@ type expr =
    | EStruct of (string * expr) list
 *)
 
-and lexpr = LEVar of identifier | LEMapWrite of identifier * expr
+and lexpr =
+  | LEVar of identifier
+  | LEMapWrite of lexpr * expr
+  | LEAddress of identifier * address
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier
@@ -85,6 +93,42 @@ let stmt_from_list = function
   | h :: t -> List.fold_left (fun s1 s2 -> SThen (s1, s2)) h t
 
 let is_literal = function ELiteral _ -> true | _ -> false
+let lexpr_is_address = function LEAddress _ -> true | _ -> false
+let expr_is_address = function EGetAddress _ -> true | _ -> false
+let ( let* ) = Result.bind
+
+let rec find_address_in_value v addr =
+  match (v, addr) with
+  | _, [] -> Ok v
+  | V.Map a, h :: t when List.mem_assoc h a ->
+      find_address_in_value (List.assoc h a) t
+  | V.Map a, h :: _t ->
+      Error
+        (IndexOutOfBounds
+           (Format.asprintf "%a in %a" V.pp_print_index h V.pp_print_value
+              (V.Map a)))
+  | _, _h :: _t ->
+      Error
+        (UnsupportedOperation
+           (Format.asprintf "Cannot index %a." V.pp_print_value v))
+
+let rec set_address_in_value v addr new_value =
+  match (v, addr) with
+  | _, [] ->
+      Error (InterpretorError "Problem setting value. This should not happen.")
+  | V.Map a, h :: [] -> Ok (V.Map ((h, new_value) :: List.remove_assoc h a))
+  | V.Map a, h :: t when List.mem_assoc h a ->
+      let* v' = set_address_in_value (List.assoc h a) t new_value in
+      Ok (V.Map ((h, v') :: List.remove_assoc h a))
+  | V.Map a, h :: _t ->
+      Error
+        (IndexOutOfBounds
+           (Format.asprintf "%a in %a" V.pp_print_index h V.pp_print_value
+              (V.Map a)))
+  | _, _h :: _t ->
+      Error
+        (UnsupportedOperation
+           (Format.asprintf "Cannot index %a." V.pp_print_value v))
 
 open Format
 
@@ -119,6 +163,9 @@ let pp_print_unop f = function
   | UBNeg -> pp_print_string f "!"
   | UNot -> pp_print_string f "NOT"
 
+let pp_print_address =
+  pp_print_list ~pp_sep:(fun f () -> fprintf f ",@ ") Values.pp_print_index
+
 let rec pp_print_expr f e =
   match e with
   | EUnop (o, e) -> fprintf f "@[%a %a@]" pp_print_unop o pp_print_expr e
@@ -129,11 +176,16 @@ let rec pp_print_expr f e =
   | ELiteral v -> Values.pp_print_value f v
   | EMapAccess (e1, e2) ->
       fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_expr e1 pp_print_expr e2
+  | EGetAddress (x, addr) ->
+      fprintf f "@[<2>%s[@,%a@;<0 -2>]@]" x pp_print_address addr
 
 and pp_print_lexpr f e =
   match e with
   | LEVar x -> pp_print_string f x
-  | LEMapWrite (x, e) -> fprintf f "@[<2>%s[@,%a@;<0 -2>]@]" x pp_print_expr e
+  | LEMapWrite (le, e) ->
+      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_lexpr le pp_print_expr e
+  | LEAddress (x, addr) ->
+      fprintf f "@[<2>%s[@,%a@;<0 -2>]@]" x pp_print_address addr
 
 and pp_print_stmt f s =
   match s with

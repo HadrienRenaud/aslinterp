@@ -44,6 +44,8 @@ type unop = UMinus  (** [-] *) | UBNeg  (** [!] *) | UNot  (** [NOT] *)
 (** {3 Expressions} *)
 
 type identifier = string
+type address = Values.index list
+
 (** The type of named element in the program, such as variables, functions, fields .. *)
 
 module IdMap : Map.S with type key = identifier
@@ -56,6 +58,7 @@ type expr =
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
   | EMapAccess of expr * expr  (** e1[e2] *)
+  | EGetAddress of identifier * address  (** e1[addr] *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)
@@ -73,7 +76,10 @@ type expr =
 
 (** {3 Statements} *)
 
-and lexpr = LEVar of identifier | LEMapWrite of identifier * expr
+and lexpr =
+  | LEVar of identifier
+  | LEMapWrite of lexpr * expr
+  | LEAddress of identifier * address
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier
@@ -108,6 +114,22 @@ and subpgm = string list * stmt
 (** In ASL, functions and subprograms have the same external context as the other statements.
    However, during interpretation, a subprogram builds a context, which are the local
    variables that it has created. *)
+
+(** {2 Address management} *)
+
+val lexpr_is_address : lexpr -> bool
+(** Returns true if the argument is an address, false otherwise *)
+
+val expr_is_address : expr -> bool
+(** Returns true if the argument is an address, false otherwise *)
+
+val find_address_in_value :
+  Values.value -> address -> Values.value Errors.result
+(** Find the value referenced by the address into the value tree. *)
+
+val set_address_in_value :
+  Values.value -> address -> Values.value -> Values.value Errors.result
+(** [set_address_in_value obj addr new_value] returns [obj] with [new_value] referenced by [addr]. *)
 
 (** {2 Utilities} *)
 

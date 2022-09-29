@@ -4,24 +4,32 @@ open Errors
 
 module type CONTEXT = sig
   type t
-  type addr = Syntax.identifier
 
   val empty : t
-  val find : addr -> t -> Values.value result
-  val set : addr -> Values.value -> t -> t result
+  val find : S.identifier -> S.address -> t -> Values.value result
+  val set : S.identifier -> S.address -> Values.value -> t -> t result
   val pp_print : Format.formatter -> t -> unit
 end
 
+let ( let* ) = Result.bind
+
 module SequentialContext : CONTEXT = struct
   type t = V.value S.IdMap.t
-  type addr = Syntax.identifier
 
   let empty = S.IdMap.empty
 
-  let find x c =
-    S.IdMap.find_opt x c |> Option.to_result ~none:(UndefinedVariable x)
+  let find x addr c =
+    match S.IdMap.find_opt x c with
+    | None -> Error (UndefinedVariable x)
+    | Some v -> S.find_address_in_value v addr
 
-  let set x v c = Ok (S.IdMap.add x v c)
+  let set x addr new_value c =
+    match (addr, S.IdMap.find_opt x c) with
+    | [], _ -> Ok (S.IdMap.add x new_value c)
+    | _, Some v ->
+        let* v' = S.set_address_in_value v addr new_value in
+        Ok (S.IdMap.add x v' c)
+    | _, None -> Error (UndefinedVariable x)
 
   let pp_print f c =
     let pp_print_var f e =

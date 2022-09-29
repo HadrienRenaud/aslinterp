@@ -6,18 +6,17 @@ module type CONTEXT = sig
   type t
   (** The type of the context *)
 
-  type addr = Syntax.identifier
-  (** Variables *)
-
   val empty : t
   (** The empty context *)
 
-  val find : addr -> t -> Values.value Errors.result
-  (** Gives the value of a variable.
+  val find :
+    Syntax.identifier -> Syntax.address -> t -> Values.value Errors.result
+  (** Gives the value of a variable, with an index address.
 
       Warning: an unbound variable will trigger a runtime error.*)
 
-  val set : addr -> Values.value -> t -> t Errors.result
+  val set :
+    Syntax.identifier -> Syntax.address -> Values.value -> t -> t Errors.result
   (** Binds the variable to its new value. *)
 
   val pp_print : Format.formatter -> t -> unit

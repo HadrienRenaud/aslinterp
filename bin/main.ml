@@ -8,10 +8,27 @@ let () =
   let s =
     stmt_from_list
       [
-        SAssign (LEVar "Mem", ELiteral (Map [ (IInt (Z.of_int 1), make_int 4) ]));
-        SAssign (LEVar "x", ELiteral (make_bitstring 5 8));
-        SAssign (LEMapWrite ("Mem", ELiteral (make_int 2)), EVar "x");
-        SAssign (LEVar "y", EMapAccess (EVar "Mem", ELiteral (make_int 1)));
+        SAssign
+          ( LEVar "Matrix",
+            ELiteral
+              (make_array
+                 [
+                   make_array [ make_int 1; make_int 2; make_int 3 ];
+                   make_array [ make_int 4; make_int 5; make_int 6 ];
+                   make_array [ make_int 7; make_int 8; make_int 9 ];
+                 ]) );
+        SAssign (LEVar "zero", ELiteral (make_int 0));
+        SAssign (LEVar "one", ELiteral (make_int 1));
+        SAssign (LEVar "two", ELiteral (make_int 2));
+        SAssign (LEVar "three", ELiteral (make_int 3));
+        SAssign (LEVar "four", ELiteral (make_int 4));
+        SAssign
+          ( LEVar "x",
+            EMapAccess (EMapAccess (EVar "Matrix", EVar "one"), EVar "two") );
+        SAssign
+          ( LEMapWrite (LEMapWrite (LEVar "Matrix", EVar "zero"), EVar "zero"),
+            EVar "four" );
+        SAssign (LEVar "y", EVar "three");
         SAssign (LEVar "r", EBinop (EVar "x", Plus, EVar "y"));
         SCond
           ( EBinop (EVar "x", Eq, EVar "y"),
