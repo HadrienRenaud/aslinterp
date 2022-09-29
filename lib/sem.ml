@@ -171,6 +171,36 @@ struct
   (********************************************************************************************)
   (* Statements *)
 
+  let rec is_lexpr_literal = function
+    | LEVar _ -> true
+    | LEMapWrite (le, e) -> is_literal e && is_lexpr_literal le
+
+  let rec do_one_step_lexpr c le =
+    match le with
+    | LEMapWrite (le, e) when not (is_literal e) ->
+        let* c', e' = do_one_step_expr c e in
+        Ok (c', LEMapWrite (le, e'))
+    | LEMapWrite (le, e) when not (is_lexpr_literal le) ->
+        let* c', le' = do_one_step_lexpr c le in
+        Ok (c', LEMapWrite (le', e))
+    | _ -> Error BlockedInterpretor
+
+  let rec lexpr_to_little_endian = function
+    | LEVar x -> Ok (x, [])
+    | LEMapWrite (le, ELiteral vi) ->
+        let* i = value_to_index vi in
+        let* x, rev_addr_le = lexpr_to_little_endian le in
+        Ok (x, i :: rev_addr_le)
+    | LEMapWrite (_, _) ->
+        Error
+          (InterpretorError
+             "Cannot convert left-hand expression to address: not fully \
+              reduced.")
+
+  let lexpr_to_big_endian le =
+    let* x, rev_addr = lexpr_to_little_endian le in
+    Ok (x, List.rev rev_addr)
+
   let rec do_one_step_stmt c s =
     match s with
     (* Rule Reduce-Then-Left *)
@@ -186,14 +216,18 @@ struct
         let* c' = Ctx.set x [] v c in
         Ok (c', SPass)
     (* Rule Reduce-Map-Write *)
-    | SAssign (LEMapWrite (x, ELiteral vi), ELiteral v2) ->
-        let* i = value_to_index vi in
-        let* c' = Ctx.set x [ i ] v2 c in
+    | SAssign (le, ELiteral v2) when is_lexpr_literal le ->
+        let* x, addr = lexpr_to_big_endian le in
+        let* c' = Ctx.set x addr v2 c in
         Ok (c', SPass)
-    (* Rule Progress-Assign *)
-    | SAssign (x, e) when not (is_literal e) ->
+    (* Rule Progress-Assign-Right *)
+    | SAssign (le, e) when not (is_literal e) ->
         let* c', e' = do_one_step_expr c e in
-        Ok (c', SAssign (x, e'))
+        Ok (c', SAssign (le, e'))
+    (* Rule Progress-Assign-Left *)
+    | SAssign (le, e) when not (is_lexpr_literal le) ->
+        let* c', le' = do_one_step_lexpr c le in
+        Ok (c', SAssign (le', e))
     (* Rule Reduce-Cond *)
     | SCond (ELiteral (Bool b), s1, s2) -> Ok (c, if b then s1 else s2)
     (* Rule Progress-Cond *)
