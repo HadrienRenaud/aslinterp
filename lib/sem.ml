@@ -141,18 +141,11 @@ struct
         let* v = eval_binop v1 o v2 in
         Ok (c, ELiteral v)
     (* Rule Reduce-Map-Access *)
-    | EMapAccess (ELiteral (Map l), ELiteral v) -> (
-        let* i = value_to_index v in
-        match List.assoc_opt i l with
-        | Some v' -> Ok (c, ELiteral v')
-        | None ->
-            Error
-              (IndexOutOfBounds
-                 (Format.asprintf "Index %a not defined in %a" pp_print_index i
-                    pp_print_value (Map l))))
-    (* | EMapAccess (EVar x, ELiteral v) ->
-        let* i = value_to_index v in
-        Ok (c, EGetAddress (x, [ i ])) *)
+    | EMapAccess (ELiteral va, ELiteral vi) ->
+        let* i = value_to_index vi in
+        (* Relies on address semantics to reduce *)
+        let* v' = find_address_in_value va [ i ] in
+        Ok (c, ELiteral v')
     | EMapAccess (EGetAddress (x, addr), ELiteral v) ->
         let* i = value_to_index v in
         let addr' = List.append addr [ i ] in
