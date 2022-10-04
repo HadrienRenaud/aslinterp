@@ -7,9 +7,11 @@ open Errors
 
 let eval_binop v1 o v2 =
   match (v1, o, v2) with
+  | Bitstr s1, Eq, Bitstr s2 -> Ok (Bool (Array.for_all2 (==) s1 s2))
+  | Bitstr s1, NEq, Bitstr s2 -> Ok (Bool (Array.exists2 (!=) s1 s2))
   | _, Eq, _ -> Ok (Bool (v1 == v2))
   | _, NEq, _ ->
-      Ok (Bool (v1 != v2)) (* It should be working on all kinds of values *)
+      Ok (Bool (v1 != v2)) (* It should be working on all kinds of immutable values *)
   (* Operations on Int *)
   | Int x, LT, Int y -> Ok (Bool (x < y))
   | Int x, Leq, Int y -> Ok (Bool (x <= y))
