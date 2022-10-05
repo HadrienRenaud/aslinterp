@@ -1,6 +1,6 @@
 type error =
   | DivisionByZero
-  | TypeError of string * Values.value
+  | TypeError of string
   | UnsupportedOperation of string
   | SemanticError of string
   | UndefinedVariable of string
@@ -11,9 +11,7 @@ type error =
 let pp_print_error f e =
   match e with
   | DivisionByZero -> Format.pp_print_string f "Division by zero"
-  | TypeError (s, v) ->
-      Format.fprintf f "Type error: value %a is not of required type %s."
-        Values.pp_print_value v s
+  | TypeError s -> Format.fprintf f "Type error: %s" s
   | UnsupportedOperation s -> Format.fprintf f "Unsupported operation: %s" s
   | SemanticError s -> Format.fprintf f "Semantic error: %s" s
   | UndefinedVariable x -> Format.fprintf f "Variable %s is undefined." x

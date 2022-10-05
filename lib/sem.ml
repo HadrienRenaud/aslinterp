@@ -109,7 +109,10 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
 
   let unpack_bool = function
     | VBool b -> Ok b
-    | v -> Error (TypeError ("bool", v))
+    | v ->
+        Error
+          (TypeError
+             (Format.asprintf "Value %a is not a boolean." pp_print_value v))
 
   let rec eval_expr c e =
     match e with
