@@ -66,3 +66,22 @@ let z_of_bitvector s =
 let make_int x = VInt (Z.of_int x)
 let make_real x = VReal (Q.of_float x)
 let make_bitvector x l = VBitVec (bitvector_of_z (Z.of_int x) l)
+
+let rec find_in_value v addr =
+  let open Errors in
+  match (v, addr) with
+  | _, [] -> Ok v
+  | VRecord l, VString s :: t when List.mem_assoc s l ->
+      find_in_value (List.assoc s l) t
+  | VArray l, VInt i :: t when List.mem_assoc i l ->
+      find_in_value (List.assoc i l) t
+  | VArray _, VInt i :: _ ->
+      Error
+        (IndexOutOfBounds
+           (Format.asprintf "Index %a is not defined for %a" pp_print_value
+              (VInt i) pp_print_value v))
+  | _, t :: _ ->
+      Error
+        (UnsupportedOperation
+           (Format.asprintf "Indexing %a with %a." pp_print_value v
+              pp_print_value t))

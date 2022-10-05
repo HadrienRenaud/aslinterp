@@ -56,6 +56,7 @@ type expr =
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
   | ECond of expr * expr * expr  (** [if e1 then e2 else e3] *)
+  | EGetArray of expr * expr  (** [e1[e2]], but only for arrays *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)

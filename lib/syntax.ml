@@ -35,6 +35,7 @@ type expr =
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
   | ECond of expr * expr * expr  (** [if e1 then e2 else e3] *)
+  | EGetArray of expr * expr  (** [e1[e2]], but only for arrays *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)
@@ -129,6 +130,8 @@ let rec pp_print_expr f e =
   | ECond (e1, e2, e3) ->
       fprintf f "@[<3>@[<h>if@ %a@ then@]@ %a@ else@ %a@]" pp_print_expr e1
         pp_print_expr e2 pp_print_expr e3
+  | EGetArray (e1, e2) ->
+      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_expr e1 pp_print_expr e2
 
 and pp_print_lexpr f e = match e with LEVar x -> pp_print_string f x
 

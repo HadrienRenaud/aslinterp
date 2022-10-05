@@ -137,6 +137,11 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
         let* b = unpack_bool v' in
         let* c'', v'' = eval_expr c' (if b then e2 else e3) in
         Ok (c'', v'')
+    | EGetArray (e1, e2) ->
+        let* c', v2 = eval_expr c e2 in
+        let* c'', v1 = eval_expr c' e1 in
+        let* v = find_in_value v1 [ v2 ] in
+        Ok (c'', v)
 
   (********************************************************************************************)
   (* Statements *)
