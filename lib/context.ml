@@ -47,11 +47,20 @@ end
 module Logger (Ctx : CONTEXT) = struct
   include Ctx
 
-  let find x c =
-    Format.eprintf "Using %s@\n" x;
-    Ctx.find x c
+  let print_maybe_addr f = function
+    | x, [] -> Format.pp_print_string f x
+    | x, addr ->
+        Format.fprintf f "@[<2>%s@ [ %a ]@]" x
+          (Format.pp_print_list
+             ~pp_sep:(fun f () -> Format.fprintf f ",@ ")
+             Values.pp_print_value)
+          addr
+
+  let find x addr c =
+    Format.eprintf "Using   %a@\n" print_maybe_addr (x, addr);
+    Ctx.find x addr c
 
   let set x addr v c =
-    Format.eprintf "Setting %s@\n" x;
+    Format.eprintf "Setting %a@\n" print_maybe_addr (x, addr);
     Ctx.set x addr v c
 end
