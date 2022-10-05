@@ -24,9 +24,9 @@ let eval_binop v1 o v2 =
   | Int x, DIV, Int y -> Ok (Int Z.(x / y))
   | Int _, MOD, Int y when y = Z.zero -> Error DivisionByZero
   | Int x, MOD, Int y -> Ok (Int Z.(x mod y))
-  | Int x, RSh, Int y -> Ok (Int Z.(x asr Z.to_int y))
-  | Int x, LSh, Int y -> Ok (Int Z.(x lsl Z.to_int y))
-  | Int x, Pow, Int y -> Ok (Int Z.(x ** Z.to_int y))
+  | Int x, RSh, Int y -> Ok (Int Z.(x asr to_int y))
+  | Int x, LSh, Int y -> Ok (Int Z.(x lsl to_int y))
+  | Int x, Pow, Int y -> Ok (Int Z.(x ** to_int y))
   (* Operations on Real *)
   | Real x, LT, Real y -> Ok (Bool (x < y))
   | Real x, Leq, Real y -> Ok (Bool (x <= y))
