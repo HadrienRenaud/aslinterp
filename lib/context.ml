@@ -7,7 +7,7 @@ module type CONTEXT = sig
 
   val empty : t
   val find : S.identifier -> t -> Values.value result
-  val set : S.identifier -> Values.value -> t -> t result
+  val set : S.identifier -> Values.value list -> Values.value -> t -> t result
   val pp_print : Format.formatter -> t -> unit
 end
 
@@ -19,7 +19,16 @@ module SequentialContext : CONTEXT = struct
   let find x c =
     S.IdMap.find_opt x c |> Option.to_result ~none:(UndefinedVariable x)
 
-  let set x v c = Ok (S.IdMap.add x v c)
+  let set x addr v c =
+    match addr with
+    | [] -> Ok (S.IdMap.add x v c)
+    | _ -> (
+        match S.IdMap.find_opt x c with
+        | None -> Error (UndefinedVariable x)
+        | Some w -> (
+            match Values.set_in_value w addr v with
+            | Error e -> Error e
+            | Ok w' -> Ok (S.IdMap.add x w' c)))
 
   let pp_print f c =
     let pp_print_var f e =
@@ -40,7 +49,7 @@ module Logger (Ctx : CONTEXT) = struct
     Format.eprintf "Using %s@\n" x;
     Ctx.find x c
 
-  let set x v c =
+  let set x addr v c =
     Format.eprintf "Setting %s@\n" x;
-    Ctx.set x v c
+    Ctx.set x addr v c
 end

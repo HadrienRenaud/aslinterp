@@ -78,10 +78,34 @@ let rec find_in_value v addr =
   | VArray _, VInt i :: _ ->
       Error
         (IndexOutOfBounds
-           (Format.asprintf "Index %a is not defined for %a" pp_print_value
-              (VInt i) pp_print_value v))
+           (Format.asprintf "@[<2>Index %a@ is not defined for@ %a@]"
+              pp_print_value (VInt i) pp_print_value v))
   | _, t :: _ ->
       Error
         (UnsupportedOperation
-           (Format.asprintf "Indexing %a with %a." pp_print_value v
+           (Format.asprintf "@[<2>Indexing %a@ with@ %a@]" pp_print_value v
               pp_print_value t))
+
+let rec set_in_value source addr to_write =
+  let open Errors in
+  let ( let* ) = Result.bind in
+  match (source, addr) with
+  | _, [] -> Ok to_write
+  | VRecord l, VString s :: t when List.mem_assoc s l ->
+      let* w = set_in_value (List.assoc s l) t to_write in
+      let l' = (s, w) :: List.remove_assoc s l in
+      Ok (VRecord l')
+  | VArray l, VInt i :: t when List.mem_assoc i l ->
+      let* w = set_in_value (List.assoc i l) t to_write in
+      let l' = (i, w) :: List.remove_assoc i l in
+      Ok (VArray l')
+  | VArray _, VInt i :: _ ->
+      Error
+        (IndexOutOfBounds
+           (Format.asprintf "@[<2>Index %a@ is not defined for@ %a@]"
+              pp_print_value (VInt i) pp_print_value source))
+  | _, h :: _ ->
+      Error
+        (UnsupportedOperation
+           (Format.asprintf "@[<2>Indexing %a@ with@ %a.@]" pp_print_value
+              source pp_print_value h))

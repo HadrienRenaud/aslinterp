@@ -145,6 +145,19 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
 
   (********************************************************************************************)
   (* Statements *)
+
+  let eval_lexpr c le =
+    let rec eval_lexpr_little_endian c le =
+      match le with
+      | LEVar x -> Ok (c, x, [])
+      | LESetArray (le', e) ->
+          let* c', v = eval_expr c e in
+          let* c'', x, addr_rev = eval_lexpr_little_endian c' le' in
+          Ok (c'', x, v :: addr_rev)
+    in
+    let* c', x, addr_rev = eval_lexpr_little_endian c le in
+    Ok (c', x, List.rev addr_rev)
+
   let rec do_one_step_stmt c s =
     match s with
     (* Rule Reduce-Then-Left *)
@@ -154,10 +167,11 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
         let* c', s1' = do_one_step_stmt c s1 in
         Ok (c', SThen (s1', s2))
     (* Rule Reduce-Map-Write *)
-    | SAssign (LEVar x, e) ->
-        let* c', v = eval_expr c e in
-        let* c'' = Ctx.set x v c' in
-        Ok (c'', SPass)
+    | SAssign (le, e) ->
+        let* c1, v = eval_expr c e in
+        let* c2, x, addr = eval_lexpr c1 le in
+        let* c3 = Ctx.set x addr v c2 in
+        Ok (c3, SPass)
     (* Rule Reduce-Cond *)
     | SCond (e, s1, s2) ->
         let* c', v = eval_expr c e in

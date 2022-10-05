@@ -24,3 +24,4 @@ val make_int : int -> value
 val make_real : float -> value
 val make_bitvector : int -> int -> value
 val find_in_value : value -> value list -> value Errors.result
+val set_in_value : value -> value list -> value -> value Errors.result
