@@ -1,5 +1,6 @@
 type error =
   | DivisionByZero
+  | TypeError of string * Values.value
   | UnsupportedOperation of string
   | SemanticError of string
   | UndefinedVariable of string

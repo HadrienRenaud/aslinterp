@@ -34,7 +34,6 @@ type expr =
   | EVar of identifier  (** A variable *)
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
-  | EMapAccess of expr * expr  (** e1[e2] *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)
@@ -50,7 +49,7 @@ type expr =
    | EStruct of (string * expr) list
 *)
 
-and lexpr = LEVar of identifier | LEMapWrite of lexpr * expr
+and lexpr = LEVar of identifier
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier
@@ -78,7 +77,6 @@ and stmt =
    | STry
    | SPragma
 *)
-and subpgm = string list * stmt
 
 let stmt_from_list = function
   | [] -> SPass
@@ -127,14 +125,8 @@ let rec pp_print_expr f e =
         pp_print_expr e2
   | EVar x -> pp_print_string f x
   | ELiteral v -> Values.pp_print_value f v
-  | EMapAccess (e1, e2) ->
-      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_expr e1 pp_print_expr e2
 
-and pp_print_lexpr f e =
-  match e with
-  | LEVar x -> pp_print_string f x
-  | LEMapWrite (le, e) ->
-      fprintf f "@[<2>%a[@,%a@;<0 -2>]@]" pp_print_lexpr le pp_print_expr e
+and pp_print_lexpr f e = match e with LEVar x -> pp_print_string f x
 
 and pp_print_stmt f s =
   match s with
@@ -146,9 +138,3 @@ and pp_print_stmt f s =
   | SCond (e, s1, s2) ->
       fprintf f "@[<3>@[<h>if@ %a@ then@]@ %a@ else@ %a@]" pp_print_expr e
         pp_print_stmt s1 pp_print_stmt s2
-
-and pp_print_subpgm f = function
-  | args, s ->
-      fprintf f "@[<hov 3>@[<hv 2>fun %a@]@ => %a@]"
-        (pp_print_list ~pp_sep:pp_print_space pp_print_string)
-        args pp_print_stmt s

@@ -55,7 +55,6 @@ type expr =
   | EVar of identifier  (** A variable *)
   | EUnop of unop * expr  (** [- e] *)
   | EBinop of expr * binop * expr  (** [e1 + e2] *)
-  | EMapAccess of expr * expr  (** e1[e2] *)
 (* Unsupported now:
    | EUnknown (** [UNKNWON] *)
    | EUnstable (** [UNSTABLE] *)
@@ -73,7 +72,7 @@ type expr =
 
 (** {3 Statements} *)
 
-and lexpr = LEVar of identifier | LEMapWrite of lexpr * expr
+and lexpr = LEVar of identifier
 (* Unsupported now:
    | LEVars of lexpr
    | LEField of lexpr * identifier
@@ -101,14 +100,6 @@ and stmt =
    | SPragma
 *)
 
-(** {3 Subprograms} *)
-
-(** The type subpgm is the type of functions created in ASL. *)
-and subpgm = string list * stmt
-(** In ASL, functions and subprograms have the same external context as the other statements.
-   However, during interpretation, a subprogram builds a context, which are the local
-   variables that it has created. *)
-
 (** {2 Utilities} *)
 
 val stmt_from_list : stmt list -> stmt
@@ -124,4 +115,3 @@ val pp_print_binop : Format.formatter -> binop -> unit
 val pp_print_expr : Format.formatter -> expr -> unit
 val pp_print_lexpr : Format.formatter -> lexpr -> unit
 val pp_print_stmt : Format.formatter -> stmt -> unit
-val pp_print_subpgm : Format.formatter -> subpgm -> unit
