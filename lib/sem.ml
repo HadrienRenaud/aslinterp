@@ -107,6 +107,10 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
 
   let ( let* ) = Result.bind
 
+  let unpack_bool = function
+    | VBool b -> Ok b
+    | v -> Error (TypeError ("bool", v))
+
   let rec eval_expr c e =
     match e with
     | ELiteral v -> Ok (c, v)
@@ -125,13 +129,14 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
         let* c2, v2 = eval_expr c1 e2 in
         let* v = eval_binop v1 o v2 in
         Ok (c2, v)
+    | ECond (e1, e2, e3) ->
+        let* c', v' = eval_expr c e1 in
+        let* b = unpack_bool v' in
+        let* c'', v'' = eval_expr c' (if b then e2 else e3) in
+        Ok (c'', v'')
 
   (********************************************************************************************)
   (* Statements *)
-  let unpack_bool = function
-    | VBool b -> Ok b
-    | v -> Error (TypeError ("bool", v))
-
   let rec do_one_step_stmt c s =
     match s with
     (* Rule Reduce-Then-Left *)
