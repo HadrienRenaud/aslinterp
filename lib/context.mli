@@ -9,7 +9,8 @@ module type CONTEXT = sig
   val empty : t
   (** The empty context *)
 
-  val find : Syntax.identifier -> t -> Values.value Errors.result
+  val find :
+    Syntax.identifier -> Values.value list -> t -> Values.value Errors.result
   (** Gives the value of a variable. *)
 
   val set :

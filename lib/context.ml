@@ -6,7 +6,7 @@ module type CONTEXT = sig
   type t
 
   val empty : t
-  val find : S.identifier -> t -> Values.value result
+  val find : S.identifier -> Values.value list -> t -> Values.value result
   val set : S.identifier -> Values.value list -> Values.value -> t -> t result
   val pp_print : Format.formatter -> t -> unit
 end
@@ -16,8 +16,10 @@ module SequentialContext : CONTEXT = struct
 
   let empty = S.IdMap.empty
 
-  let find x c =
-    S.IdMap.find_opt x c |> Option.to_result ~none:(UndefinedVariable x)
+  let find x addr c =
+    match S.IdMap.find_opt x c with
+    | None -> Error (UndefinedVariable x)
+    | Some v -> Values.find_in_value v addr
 
   let set x addr v c =
     match addr with

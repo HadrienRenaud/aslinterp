@@ -117,10 +117,6 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
   let rec eval_expr c e =
     match e with
     | ELiteral v -> Ok (c, v)
-    (* Rule Extract-Context  *)
-    | EVar x ->
-        let* v = Ctx.find x c in
-        Ok (c, v)
     (* Rule Reduce-Unop *)
     | EUnop (o, e') ->
         let* c', v = eval_expr c e' in
@@ -137,11 +133,22 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
         let* b = unpack_bool v' in
         let* c'', v'' = eval_expr c' (if b then e2 else e3) in
         Ok (c'', v'')
+    | EGetArray _ | EVar _ ->
+        let* c', x, addr = eval_expr_addr c e in
+        let* v = Ctx.find x (List.rev addr) c' in
+        Ok (c', v)
+
+  and eval_expr_addr c e =
+    match e with
+    | EVar x -> Ok (c, x, [])
     | EGetArray (e1, e2) ->
-        let* c', v2 = eval_expr c e2 in
-        let* c'', v1 = eval_expr c' e1 in
-        let* v = find_in_value v1 [ v2 ] in
-        Ok (c'', v)
+        let* c', v = eval_expr c e2 in
+        let* c'', x, addr = eval_expr_addr c' e1 in
+        Ok (c'', x, v :: addr)
+    | _ ->
+        Error
+          (UnsupportedOperation
+             (Format.asprintf "Unsupported get into %a" pp_print_expr e))
 
   (********************************************************************************************)
   (* Statements *)
