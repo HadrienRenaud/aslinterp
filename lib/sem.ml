@@ -8,8 +8,8 @@ open Errors
 let eval_binop v1 o v2 =
   match (v1, o, v2) with
   (* This should be working on all kinds of immutable values *)
-  | _, Eq, _ -> Ok (VBool (v1 == v2))
-  | _, NEq, _ -> Ok (VBool (v1 != v2))
+  | _, Eq, _ -> Ok (VBool (compare v1 v2 == 0))
+  | _, NEq, _ -> Ok (VBool (compare v1 v2 <> 0))
   (* Operations on Int *)
   | VInt x, LT, VInt y -> Ok (VBool (x < y))
   | VInt x, Leq, VInt y -> Ok (VBool (x <= y))
