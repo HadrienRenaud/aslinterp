@@ -80,6 +80,8 @@ and stmt =
    | SPragma
 *)
 
+type subpgm = Procedure of identifier * identifier list * stmt
+
 let stmt_from_list = function
   | [] -> SPass
   | h :: t -> List.fold_left (fun s1 s2 -> SThen (s1, s2)) h t
@@ -149,3 +151,10 @@ and pp_print_stmt f s =
   | SCond (e, s1, s2) ->
       fprintf f "@[<3>@[<h>if@ %a@ then@]@ %a@ else@ %a@]" pp_print_expr e
         pp_print_stmt s1 pp_print_stmt s2
+
+let pp_print_subpgm f s =
+  match s with
+  | Procedure (name, args, st) ->
+      fprintf f "@[<2>func %s(@,%a@,):@;<1 2>%a@;<1 -2>end@]" name
+        (pp_print_list ~pp_sep:(fun f () -> fprintf f ",@ ") pp_print_string)
+        args pp_print_stmt st

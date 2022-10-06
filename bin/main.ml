@@ -12,7 +12,7 @@ let run_and_print = function
       pp_print_stmt Format.std_formatter s;
       Format.printf "@\n-------------------------@\n";
       (match S.eval_stmt c s with
-      | Ok c ->
+      | Ok (c, _) ->
           Format.printf "OK@\n";
           C.pp_print Format.std_formatter c
       | Error e -> pp_print_error Format.std_formatter e);
@@ -36,9 +36,9 @@ let cas =
     let s = Z.of_int 1 in
     let t = Z.of_int 2 in
     let n = Z.of_int 3 in
-    let old_value = make_int 1 in
-    let compare_value = make_int 1 in
-    let new_value = make_int 2 in
+    let old_value = make_bitvector 1 8 in
+    let compare_value = make_bitvector 1 8 in
+    let new_value = make_bitvector 2 8 in
     let memory = VArray [ (address, old_value) ] in
     let x = VArray [ (s, compare_value); (t, new_value); (n, VInt address) ] in
     let c = C.empty in

@@ -95,7 +95,13 @@ module type INTERPRETER = sig
   val do_one_step_stmt :
     context -> Syntax.stmt -> (context * Syntax.stmt) Errors.result
 
-  val eval_stmt : context -> Syntax.stmt -> context Errors.result
+  val eval_stmt : context -> Syntax.stmt -> (context * Values.value option) Errors.result
+
+  val eval_subpgm :
+    context ->
+    Syntax.subpgm ->
+    Values.value list ->
+    (context * Values.value option) Errors.result
 end
 
 module MakeInterpreter (Ctx : Context.CONTEXT) = struct
@@ -153,7 +159,7 @@ module MakeInterpreter (Ctx : Context.CONTEXT) = struct
   (********************************************************************************************)
   (* Statements *)
 
-  let eval_lexpr c le =
+  and eval_lexpr c le =
     let rec eval_lexpr_little_endian c le =
       match le with
       | LEVar x -> Ok (c, x, [])
@@ -165,7 +171,7 @@ module MakeInterpreter (Ctx : Context.CONTEXT) = struct
     let* c', x, addr_rev = eval_lexpr_little_endian c le in
     Ok (c', x, List.rev addr_rev)
 
-  let rec do_one_step_stmt c s =
+  and do_one_step_stmt c s =
     match s with
     (* Rule Reduce-Then-Left *)
     | SThen (SPass, s2) -> Ok (c, s2)
@@ -186,11 +192,22 @@ module MakeInterpreter (Ctx : Context.CONTEXT) = struct
         Ok (c', if b then s1 else s2)
     | SPass -> Error BlockedInterpreter
 
-  let rec eval_stmt c s =
+  and eval_stmt c s =
     match do_one_step_stmt c s with
-    | Ok (c', SPass) -> Ok c'
+    | Ok (c', SPass) -> Ok (c', None)
     | Ok (c', s') -> eval_stmt c' s'
     | Error e -> Error e
+
+  (********************************************************************************************)
+  (* Sub programs *)
+
+  and eval_subpgm c spgm args =
+    match spgm with
+    | Procedure (_name, args_names, s) ->
+        let assigner n v = SAssign (LEVar n, ELiteral v) in
+        let s0 = stmt_from_list @@ List.map2 assigner args_names args in
+        let s' = SThen (s0, s) in
+        eval_stmt c s'
 end
 
 module SequentialInterpreter =

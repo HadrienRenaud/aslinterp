@@ -102,6 +102,10 @@ and stmt =
    | SPragma
 *)
 
+type subpgm = Procedure of identifier * identifier list * stmt
+(** The type of functions *)
+
+
 (** {2 Utilities} *)
 
 val stmt_from_list : stmt list -> stmt
@@ -117,3 +121,4 @@ val pp_print_binop : Format.formatter -> binop -> unit
 val pp_print_expr : Format.formatter -> expr -> unit
 val pp_print_lexpr : Format.formatter -> lexpr -> unit
 val pp_print_stmt : Format.formatter -> stmt -> unit
+val pp_print_subpgm : Format.formatter -> subpgm -> unit
