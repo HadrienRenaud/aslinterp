@@ -66,7 +66,7 @@ and stmt =
   | SThen of stmt * stmt
   | SAssign of lexpr * expr
   | SCond of expr * stmt * stmt
-
+  | SProcedureCall of identifier * expr list
 (* Unsupported now:
    | SFuncall of string * expr list
    | SReturn of expr option
@@ -121,6 +121,8 @@ let pp_print_unop f = function
   | UBNeg -> pp_print_string f "!"
   | UNot -> pp_print_string f "NOT"
 
+let list_sep f () = fprintf f ",@ "
+
 let rec pp_print_expr f e =
   match e with
   | EUnop (o, e) -> fprintf f "@[%a %a@]" pp_print_unop o pp_print_expr e
@@ -151,10 +153,14 @@ and pp_print_stmt f s =
   | SCond (e, s1, s2) ->
       fprintf f "@[<3>@[<h>if@ %a@ then@]@ %a@ else@ %a@]" pp_print_expr e
         pp_print_stmt s1 pp_print_stmt s2
+  | SProcedureCall (x, args) ->
+      fprintf f "@[<3>%s(@,%a@;<0 -3>)@]" x
+        (pp_print_list ~pp_sep:list_sep pp_print_expr)
+        args
 
 let pp_print_subpgm f s =
   match s with
   | Procedure (name, args, st) ->
       fprintf f "@[<2>func %s(@,%a@,):@;<1 2>%a@;<1 -2>end@]" name
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f ",@ ") pp_print_string)
+        (pp_print_list ~pp_sep:list_sep pp_print_string)
         args pp_print_stmt st

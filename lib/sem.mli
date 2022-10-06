@@ -31,7 +31,8 @@ module type INTERPRETER = sig
     semantic rules. It uses [eval_expr] for the reduction of expressions, as
     specified by the semantic rules. *)
 
-  val eval_stmt : context -> Syntax.stmt -> (context * Values.value option) Errors.result
+  val eval_stmt :
+    context -> Syntax.stmt -> (context * Values.value option) Errors.result
   (** The interpreter in itself. It works by taking the transitive closure of the
     [do_one_step_stmt] transition function. *)
 

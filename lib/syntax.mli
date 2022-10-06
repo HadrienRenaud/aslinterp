@@ -88,6 +88,7 @@ and stmt =
   | SThen of stmt * stmt
   | SAssign of lexpr * expr
   | SCond of expr * stmt * stmt
+  | SProcedureCall of identifier * expr list
 (* Unsupported now:
    | SFuncall of string * expr list
    | SReturn of expr option
@@ -102,9 +103,9 @@ and stmt =
    | SPragma
 *)
 
-type subpgm = Procedure of identifier * identifier list * stmt
-(** The type of functions *)
-
+type subpgm =
+  | Procedure of identifier * identifier list * stmt
+      (** The type of functions *)
 
 (** {2 Utilities} *)
 

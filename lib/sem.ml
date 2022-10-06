@@ -95,7 +95,8 @@ module type INTERPRETER = sig
   val do_one_step_stmt :
     context -> Syntax.stmt -> (context * Syntax.stmt) Errors.result
 
-  val eval_stmt : context -> Syntax.stmt -> (context * Values.value option) Errors.result
+  val eval_stmt :
+    context -> Syntax.stmt -> (context * Values.value option) Errors.result
 
   val eval_subpgm :
     context ->
@@ -190,6 +191,19 @@ module MakeInterpreter (Ctx : Context.CONTEXT) = struct
         let* c', v = eval_expr c e in
         let* b = unpack_bool v in
         Ok (c', if b then s1 else s2)
+    | SProcedureCall (x, args) ->
+        let* s = Ctx.find_subpgm x c in
+        let eval_arg acc e =
+          let* c, v_args_rev = acc in
+          let* c', v = eval_expr c e in
+          Ok (c', v :: v_args_rev)
+        in
+        let* c', v_args_rev = List.fold_left eval_arg (Ok (c, [])) args in
+        let v_args = List.rev v_args_rev in
+        let c_callee = Ctx.pop_locals c' in
+        let* c_callee', _ = eval_subpgm c_callee s v_args in
+        let c'' = Ctx.with_globals_from c_callee' c in
+        Ok (c'', SPass)
     | SPass -> Error BlockedInterpreter
 
   and eval_stmt c s =

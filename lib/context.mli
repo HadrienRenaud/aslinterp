@@ -17,8 +17,21 @@ module type CONTEXT = sig
     Syntax.identifier -> Values.address -> Values.value -> t -> t Errors.result
   (** Binds the variable to its new value. *)
 
+  val find_subpgm : Syntax.identifier -> t -> Syntax.subpgm Errors.result
+  (** Gives the value of a stored subprogram. *)
+
+  val pop_locals : t -> t
+  (** Gives a fresh version of the context where all locals have been removed. *)
+
+  val with_globals_from : t -> t -> t
+  (** [with_globals_from a b] returns a context with the globals of a and the locals of b *)
+
   val pp_print : Format.formatter -> t -> unit
   (** A formatting function for this context. *)
+
+  val of_globals :
+    (Syntax.identifier * Values.value) Seq.t -> Syntax.subpgm Seq.t -> t
+  (** A constructor that takes a serie of global values and a serie of functions to populate into the context. *)
 end
 
 (********************************************************************************************)
