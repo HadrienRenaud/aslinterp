@@ -1,11 +1,12 @@
 type error =
   | DivisionByZero
+  | TypeError of string
   | UnsupportedOperation of string
   | SemanticError of string
   | UndefinedVariable of string
   | IndexOutOfBounds of string
-  | InterpretorError of string
-  | BlockedInterpretor
+  | InterpreterError of string
+  | BlockedInterpreter
 
 val pp_print_error : Format.formatter -> error -> unit
 

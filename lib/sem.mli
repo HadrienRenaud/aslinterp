@@ -9,25 +9,18 @@ val eval_binop :
 val eval_unop : Syntax.unop -> Values.value -> Values.value Errors.result
 (** Evaluate an unary operation. *)
 
-(** {2 Interpretor functor} *)
-module type INTERPRETOR = sig
+(** {2 Interpreter functor} *)
+module type INTERPRETER = sig
   type context
 
   (** {3 Semantics of expressions } *)
-
-  val do_one_step_expr :
-    context -> Syntax.expr -> (context * Syntax.expr) Errors.result
-  (** A small-step transition function, that we try to keep as close as possible to the
-    semantic rules. *)
-
   val eval_expr :
     context -> Syntax.expr -> (context * Values.value) Errors.result
-  (** A evaluation function for expressions, that uses the function [do_one_step_expr] and take
-    its transitive closure. *)
+  (** Evaluates an expression inside a context. *)
 
   (** {3 Semantics of statements }
 
-    Here come the real interpretor! *)
+    Here come the real interpreter! *)
 
   val do_one_step_stmt :
     context -> Syntax.stmt -> (context * Syntax.stmt) Errors.result
@@ -35,24 +28,18 @@ module type INTERPRETOR = sig
     statements.
 
     We try to keep as close as possible to the
-    semantic rules. It uses [do_one_step_expr] for the reduction of expressions, as
+    semantic rules. It uses [eval_expr] for the reduction of expressions, as
     specified by the semantic rules. *)
 
   val eval_stmt : context -> Syntax.stmt -> context Errors.result
-  (** The interpretor in itself. It works by taking the transitive closure of the
+  (** The interpreter in itself. It works by taking the transitive closure of the
     [do_one_step_stmt] transition function. *)
 end
 
-module type SEMANTIC_DESCRIPTOR = sig
-  val semi_column_concurrent : bool
-end
+module MakeInterpreter (Ctx : Context.CONTEXT) :
+  INTERPRETER with type context = Ctx.t
 
-module SequentialSemantics : SEMANTIC_DESCRIPTOR
+(** {2 Interpreters} *)
 
-module MakeInterpretor (Ctx : Context.CONTEXT) (_ : SEMANTIC_DESCRIPTOR) :
-  INTERPRETOR with type context = Ctx.t
-
-(** {Interpretors} *)
-
-module SequentialInterpretor :
-  INTERPRETOR with type context = Context.SequentialContext.t
+module SequentialInterpreter :
+  INTERPRETER with type context = Context.SequentialContext.t
