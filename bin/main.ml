@@ -4,7 +4,7 @@ open Aslinterp.Sem
 open Aslinterp.Context
 open Aslinterp.Errors
 module C = SequentialContext
-module S = SequentialInterpretor
+module S = SequentialInterpreter
 
 let run_and_print = function
   | s, c ->

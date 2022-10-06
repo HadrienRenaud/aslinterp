@@ -10,15 +10,11 @@ module type CONTEXT = sig
   (** The empty context *)
 
   val find :
-    Syntax.identifier -> Values.value list -> t -> Values.value Errors.result
+    Syntax.identifier -> Values.address -> t -> Values.value Errors.result
   (** Gives the value of a variable. *)
 
   val set :
-    Syntax.identifier ->
-    Values.value list ->
-    Values.value ->
-    t ->
-    t Errors.result
+    Syntax.identifier -> Values.address -> Values.value -> t -> t Errors.result
   (** Binds the variable to its new value. *)
 
   val pp_print : Format.formatter -> t -> unit

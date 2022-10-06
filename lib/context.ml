@@ -6,8 +6,8 @@ module type CONTEXT = sig
   type t
 
   val empty : t
-  val find : S.identifier -> Values.value list -> t -> Values.value result
-  val set : S.identifier -> Values.value list -> Values.value -> t -> t result
+  val find : S.identifier -> V.address -> t -> Values.value result
+  val set : S.identifier -> V.address -> Values.value -> t -> t result
   val pp_print : Format.formatter -> t -> unit
 end
 
@@ -19,7 +19,7 @@ module SequentialContext : CONTEXT = struct
   let find x addr c =
     match S.IdMap.find_opt x c with
     | None -> Error (UndefinedVariable x)
-    | Some v -> Values.find_in_value v addr
+    | Some v -> V.find_address_in_value v addr
 
   let set x addr v c =
     match addr with
@@ -28,7 +28,7 @@ module SequentialContext : CONTEXT = struct
         match S.IdMap.find_opt x c with
         | None -> Error (UndefinedVariable x)
         | Some w -> (
-            match Values.set_in_value w addr v with
+            match Values.set_address_in_value w addr v with
             | Error e -> Error e
             | Ok w' -> Ok (S.IdMap.add x w' c)))
 
@@ -47,7 +47,7 @@ end
 module Logger (Ctx : CONTEXT) = struct
   include Ctx
 
-  let print_maybe_addr f = function
+  let pp_print_maybe_addr f = function
     | x, [] -> Format.pp_print_string f x
     | x, addr ->
         Format.fprintf f "@[<2>%s@ [ %a ]@]" x
@@ -57,10 +57,10 @@ module Logger (Ctx : CONTEXT) = struct
           addr
 
   let find x addr c =
-    Format.eprintf "Using   %a@\n" print_maybe_addr (x, addr);
+    Format.eprintf "Using   %a@\n" pp_print_maybe_addr (x, addr);
     Ctx.find x addr c
 
   let set x addr v c =
-    Format.eprintf "Setting %a@\n" print_maybe_addr (x, addr);
+    Format.eprintf "Setting %a@\n" pp_print_maybe_addr (x, addr);
     Ctx.set x addr v c
 end

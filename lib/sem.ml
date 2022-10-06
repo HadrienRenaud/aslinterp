@@ -84,9 +84,9 @@ let eval_unop o v =
               pp_print_unop o pp_print_value v))
 
 (********************************************************************************************)
-(* Interpretor Functor *)
+(* Interpreter Functor *)
 
-module type INTERPRETOR = sig
+module type INTERPRETER = sig
   type context
 
   val eval_expr :
@@ -98,7 +98,7 @@ module type INTERPRETOR = sig
   val eval_stmt : context -> Syntax.stmt -> context Errors.result
 end
 
-module MakeInterpretor (Ctx : Context.CONTEXT) = struct
+module MakeInterpreter (Ctx : Context.CONTEXT) = struct
   (********************************************************************************************)
   (* Expressions *)
   type context = Ctx.t
@@ -184,7 +184,7 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
         let* c', v = eval_expr c e in
         let* b = unpack_bool v in
         Ok (c', if b then s1 else s2)
-    | SPass -> Error BlockedInterpretor
+    | SPass -> Error BlockedInterpreter
 
   let rec eval_stmt c s =
     match do_one_step_stmt c s with
@@ -193,5 +193,5 @@ module MakeInterpretor (Ctx : Context.CONTEXT) = struct
     | Error e -> Error e
 end
 
-module SequentialInterpretor =
-  MakeInterpretor (Context.Logger (Context.SequentialContext))
+module SequentialInterpreter =
+  MakeInterpreter (Context.Logger (Context.SequentialContext))

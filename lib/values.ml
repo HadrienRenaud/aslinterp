@@ -17,6 +17,8 @@ and record = (string * value) list
 and varray = (Z.t * value) list
 and tuple = value list
 
+type address = value list
+
 module F = Format
 
 let pp_print_bit f b = F.pp_print_int f (if b then 1 else 0)
@@ -67,14 +69,14 @@ let make_int x = VInt (Z.of_int x)
 let make_real x = VReal (Q.of_float x)
 let make_bitvector x l = VBitVec (bitvector_of_z (Z.of_int x) l)
 
-let rec find_in_value v addr =
+let rec find_address_in_value v addr =
   let open Errors in
   match (v, addr) with
   | _, [] -> Ok v
   | VRecord l, VString s :: t when List.mem_assoc s l ->
-      find_in_value (List.assoc s l) t
+      find_address_in_value (List.assoc s l) t
   | VArray l, VInt i :: t when List.mem_assoc i l ->
-      find_in_value (List.assoc i l) t
+      find_address_in_value (List.assoc i l) t
   | VArray _, VInt i :: _ ->
       Error
         (IndexOutOfBounds
@@ -86,17 +88,17 @@ let rec find_in_value v addr =
            (Format.asprintf "@[<2>Indexing %a@ with@ %a@]" pp_print_value v
               pp_print_value t))
 
-let rec set_in_value source addr to_write =
+let rec set_address_in_value source addr to_write =
   let open Errors in
   let ( let* ) = Result.bind in
   match (source, addr) with
   | _, [] -> Ok to_write
   | VRecord l, VString s :: t when List.mem_assoc s l ->
-      let* w = set_in_value (List.assoc s l) t to_write in
+      let* w = set_address_in_value (List.assoc s l) t to_write in
       let l' = (s, w) :: List.remove_assoc s l in
       Ok (VRecord l')
   | VArray l, VInt i :: t when List.mem_assoc i l ->
-      let* w = set_in_value (List.assoc i l) t to_write in
+      let* w = set_address_in_value (List.assoc i l) t to_write in
       let l' = (i, w) :: List.remove_assoc i l in
       Ok (VArray l')
   | VArray _, VInt i :: _ ->

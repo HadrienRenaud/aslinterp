@@ -9,8 +9,8 @@ val eval_binop :
 val eval_unop : Syntax.unop -> Values.value -> Values.value Errors.result
 (** Evaluate an unary operation. *)
 
-(** {2 Interpretor functor} *)
-module type INTERPRETOR = sig
+(** {2 Interpreter functor} *)
+module type INTERPRETER = sig
   type context
 
   (** {3 Semantics of expressions } *)
@@ -20,7 +20,7 @@ module type INTERPRETOR = sig
 
   (** {3 Semantics of statements }
 
-    Here come the real interpretor! *)
+    Here come the real interpreter! *)
 
   val do_one_step_stmt :
     context -> Syntax.stmt -> (context * Syntax.stmt) Errors.result
@@ -32,14 +32,14 @@ module type INTERPRETOR = sig
     specified by the semantic rules. *)
 
   val eval_stmt : context -> Syntax.stmt -> context Errors.result
-  (** The interpretor in itself. It works by taking the transitive closure of the
+  (** The interpreter in itself. It works by taking the transitive closure of the
     [do_one_step_stmt] transition function. *)
 end
 
-module MakeInterpretor (Ctx : Context.CONTEXT) :
-  INTERPRETOR with type context = Ctx.t
+module MakeInterpreter (Ctx : Context.CONTEXT) :
+  INTERPRETER with type context = Ctx.t
 
-(** {Interpretors} *)
+(** {2 Interpreters} *)
 
-module SequentialInterpretor :
-  INTERPRETOR with type context = Context.SequentialContext.t
+module SequentialInterpreter :
+  INTERPRETER with type context = Context.SequentialContext.t
