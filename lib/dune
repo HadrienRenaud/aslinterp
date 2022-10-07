@@ -1,3 +1,6 @@
 (library
  (name aslinterp)
  (libraries zarith))
+
+(ocamllex AslLexer)
+(menhir (modules AslParser))
