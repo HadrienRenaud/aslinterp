@@ -1,3 +1,9 @@
+(ocamllex NativeLexer)
+
+(menhir
+ (modules NativeParser)
+ (flags --unused-tokens --fixed-exception))
+
 (library
  (name aslinterp)
- (libraries zarith))
+ (modules_without_implementation backend))

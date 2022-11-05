@@ -1,87 +1,32 @@
-open Aslinterp.Values
-open Aslinterp.Syntax
-open Aslinterp.Sem
-open Aslinterp.Context
-open Aslinterp.Errors
-module C = SequentialContext
-module S = SequentialInterpretor
+open Aslinterp
 
-let cas =
-  ( stmt_from_list
-      [
-        SAssign (LEVar "comparevalue", EMapAccess (EVar "X", EVar "s"));
-        SAssign (LEVar "newvalue", EMapAccess (EVar "X", EVar "t"));
-        SAssign (LEVar "address", EMapAccess (EVar "X", EVar "n"));
-        SAssign (LEVar "oldvalue", EMapAccess (EVar "Mem", EVar "address"));
-        SCond
-          ( EBinop (EVar "comparevalue", Eq, EVar "oldvalue"),
-            SAssign (LEMapWrite (LEVar "Mem", EVar "address"), EVar "newvalue"),
-            SPass );
-        SAssign (LEMapWrite (LEVar "X", EVar "s"), EVar "oldvalue");
-      ],
-    let address = Z.of_int 12345 in
-    let s = Z.of_int 1 in
-    let t = Z.of_int 2 in
-    let n = Z.of_int 3 in
-    let old_value = make_bitstring 3 8 in
-    let compare_value = make_bitstring 3 8 in
-    let new_value = make_bitstring 4 8 in
-    let memory = Map [ (IInt address, old_value) ] in
-    let x =
-      Map
-        [ (IInt s, compare_value); (IInt t, new_value); (IInt n, Int address) ]
-    in
-    let c = C.empty in
-    let c = Result.get_ok @@ C.set "s" [] (Int s) c in
-    let c = Result.get_ok @@ C.set "t" [] (Int t) c in
-    let c = Result.get_ok @@ C.set "n" [] (Int n) c in
-    let c = Result.get_ok @@ C.set "Mem" [] memory c in
-    let c = Result.get_ok @@ C.set "X" [] x c in
-    c )
+(* Taken from herdtools7/lib/Pos.ml *)
+let pp_pos chan pos =
+  let open Lexing in
+  Printf.fprintf chan "File \"%s\", line %i, character %i" pos.pos_fname
+    pos.pos_lnum
+    (pos.pos_cnum - pos.pos_bol)
 
-let run_and_print = function
-  | s, c ->
-      Format.printf "-------------------------@\n";
-      pp_print_stmt Format.std_formatter s;
-      Format.printf "@\n-------------------------@\n";
-      (match S.eval_stmt c s with
-      | Ok c -> Format.printf "OK@\n"; C.pp_print Format.std_formatter c
-      | Error e -> pp_print_error Format.std_formatter e);
-      Format.printf "@\n-------------------------\n\n@\n";
-      Format.eprintf "@\n"
+let build_ast_from_file f =
+  let lexbuf = Lexing.from_channel (open_in f) in
+  let () = Lexing.set_filename lexbuf f in
+  try NativeParser.ast NativeLexer.token lexbuf with
+  | NativeParser.Error ->
+      Printf.eprintf "%a: Cannot parse." pp_pos lexbuf.lex_curr_p;
+      exit 1
+  | LexMisc.Error (_msg, pos) ->
+      Printf.eprintf "%a: unknown token." pp_pos pos;
+      exit 1
 
-let () = run_and_print cas
+let exec ast =
+  let open Native in
+  match NativeInterpreter.run ast [] () with
+  | Ok _li -> Printf.printf "Ran ok.\n"
+  | Error err -> Printf.printf "%a\n" pp_err err
 
 let () =
-  let s =
-    stmt_from_list
-      [
-        SAssign
-          ( LEVar "Matrix",
-            ELiteral
-              (make_array
-                 [
-                   make_array [ make_int 1; make_int 2; make_int 3 ];
-                   make_array [ make_int 4; make_int 5; make_int 6 ];
-                   make_array [ make_int 7; make_int 8; make_int 9 ];
-                 ]) );
-        SAssign (LEVar "zero", ELiteral (make_int 0));
-        SAssign (LEVar "one", ELiteral (make_int 1));
-        SAssign (LEVar "two", ELiteral (make_int 2));
-        SAssign (LEVar "three", ELiteral (make_int 3));
-        SAssign (LEVar "four", ELiteral (make_int 4));
-        SAssign
-          ( LEVar "x",
-            EMapAccess (EMapAccess (EVar "Matrix", EVar "one"), EVar "two") );
-        SAssign
-          ( LEMapWrite (LEMapWrite (LEVar "Matrix", EVar "zero"), EVar "zero"),
-            EVar "four" );
-        SAssign (LEVar "y", EVar "three");
-        SAssign (LEVar "r", EBinop (EVar "x", Plus, EVar "y"));
-        SCond
-          ( EBinop (EVar "x", Eq, EVar "y"),
-            SAssign (LEVar "r'", EBinop (EVar "x", Plus, ELiteral (make_int 5))),
-            SAssign (LEVar "r'", EBinop (EVar "x", Minus, EVar "y")) );
-      ]
-  in
-  run_and_print (s, C.empty)
+  let f = Sys.argv.(1) in
+  let () = Printf.printf "\rParsing and running %s...            \n" f in
+  let parsed_ast = build_ast_from_file f in
+  let native_ast = Native.of_parsed_ast parsed_ast in
+  exec native_ast
