@@ -15,10 +15,12 @@
 
 (documentation https://url/to/documentation)
 
+(using menhir 2.1)
+
 (package
  (name aslinterp)
  (synopsis "A small but functionnal interpretor for ASL")
- (depends ocaml dune zarith alcotest)
+ (depends ocaml dune zarith alcotest menhir)
  (tags
   (topics asl ocaml interpretor)))
 

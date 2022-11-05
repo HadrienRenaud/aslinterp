@@ -1,3 +1,3 @@
 (tests
- (names aslinterp values)
+ (names aslinterp)
  (libraries alcotest zarith aslinterp))
