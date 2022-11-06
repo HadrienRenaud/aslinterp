@@ -26,6 +26,12 @@ module Make (B : Backend.S) = struct
 
   let value_of_int i : value = AST.VInt (vint_of_int i)
 
+  (*****************************************************************************)
+  (*                                                                           *)
+  (*                       Global constants environment                        *)
+  (*                                                                           *)
+  (*****************************************************************************)
+
   module GEnv = struct
     include AST.IMap
 
@@ -51,6 +57,12 @@ module Make (B : Backend.S) = struct
     let mem_value name env = Option.is_some (find_opt_value name env)
     let find_value name env = Option.get (find_opt_value name env)
   end
+
+  (*****************************************************************************)
+  (*                                                                           *)
+  (*                      Construction of the initial env                      *)
+  (*                                                                           *)
+  (*****************************************************************************)
 
   let build_enums (ast : ast) : GEnv.t =
     let build_one (counter, genv) name =
@@ -134,6 +146,12 @@ module Make (B : Backend.S) = struct
     |> fun s -> GEnv.add_seq_func s genv
 
   type eval_res = Returning of value list | Continuing
+
+  (*****************************************************************************)
+  (*                                                                           *)
+  (*                       Main interpretation functions                       *)
+  (*                                                                           *)
+  (*****************************************************************************)
 
   let rec eval_expr genv scope is_data =
     let open AST in
