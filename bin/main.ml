@@ -20,7 +20,7 @@ let build_ast_from_file f =
 
 let exec ast =
   let open Native in
-  match NativeInterpreter.run ast [] () with
+  match NativeInterpreter.run ast [] [] () with
   | Ok _li -> Printf.printf "Ran ok.\n"
   | Error err -> Printf.printf "%a\n" pp_err err
 

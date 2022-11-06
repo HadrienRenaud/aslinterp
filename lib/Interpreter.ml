@@ -2,38 +2,16 @@ module type S = sig
   module B : Backend.S
 
   type ast = B.value AST.t
+  type sfunc = B.value list -> B.value list B.m
 
-  val run : ast -> B.value list -> B.value list B.m
+  val run : ast -> (string * sfunc) list -> B.value list -> B.value list B.m
 end
 
 module Make (B : Backend.S) = struct
   module B = B
   open B
 
-  module GEnv = struct
-    include AST.IMap
-
-    type elt = Value of value | Func of int ref * value AST.func
-    type t = elt AST.IMap.t
-
-    let add_value name v = add name (Value v)
-    let add_seq_value s = add_seq (Seq.map (fun (x, v) -> (x, Value v)) s)
-
-    let add_seq_func s =
-      add_seq (Seq.map (fun (x, f) -> (x, Func (ref 0, f))) s)
-
-    let find_opt_value name env =
-      Option.bind (find_opt name env) (function Value v -> Some v | _ -> None)
-
-    let mem_value name env = Option.is_some (find_opt_value name env)
-    let find_value name env = Option.get (find_opt_value name env)
-
-    let find_opt_func name env =
-      Option.bind (find_opt name env) (function
-        | Func (scope, f) -> Some (scope, f)
-        | _ -> None)
-  end
-
+  type sfunc = value list -> value list m
   type ast = value AST.t
 
   let ( let* ) = B.bind_data
@@ -47,6 +25,32 @@ module Make (B : Backend.S) = struct
     List.fold_left one (return [])
 
   let value_of_int i : value = AST.VInt (vint_of_int i)
+
+  module GEnv = struct
+    include AST.IMap
+
+    type elt =
+      | Value of value
+      | Func of int ref * value AST.func
+      | SpecialFunc of sfunc
+
+    type t = elt AST.IMap.t
+
+    let add_value name v = add name (Value v)
+    let add_seq_value s = add_seq (Seq.map (fun (x, v) -> (x, Value v)) s)
+
+    let add_seq_func s =
+      add_seq (Seq.map (fun (x, f) -> (x, Func (ref 0, f))) s)
+
+    let add_seq_special_func s =
+      add_seq (Seq.map (fun (x, f) -> (x, SpecialFunc f)) s)
+
+    let find_opt_value name env =
+      Option.bind (find_opt name env) (function Value v -> Some v | _ -> None)
+
+    let mem_value name env = Option.is_some (find_opt_value name env)
+    let find_value name env = Option.get (find_opt_value name env)
+  end
 
   let build_enums (ast : ast) : GEnv.t =
     let build_one (counter, genv) name =
@@ -182,24 +186,24 @@ module Make (B : Backend.S) = struct
           (eval_stmt genv scope s1) (eval_stmt genv scope s2)
 
   and eval_func genv name args =
-    let* scope, arg_names, body =
-      match GEnv.find_opt_func name genv with
-      | None -> failwith ("Unknown function: " ^ name)
-      | Some (r, (_, arg_names, body)) ->
-          let scope = (name, !r) in
-          let () = r := !r + 1 in
-          return (scope, arg_names, body)
-    in
-    let one_arg x v = AST.(SAssign (LEVar x, ELiteral v)) in
-    let body =
-      AST.SThen (AST.stmt_from_list (List.map2 one_arg arg_names args), body)
-    in
-    let* res = eval_stmt genv scope body in
-    match res with Continuing -> return [] | Returning vs -> return vs
+    match GEnv.find_opt name genv with
+    | None -> failwith ("Unknown function: " ^ name)
+    | Some (GEnv.Value _) -> failwith ("Cannot call value " ^ name)
+    | Some (GEnv.SpecialFunc f) -> f args
+    | Some (GEnv.Func (r, (_, arg_names, body))) -> (
+        let scope = (name, !r) in
+        let () = r := !r + 1 in
+        let one_arg x v = AST.(SAssign (LEVar x, ELiteral v)) in
+        let body =
+          AST.SThen (AST.stmt_from_list (List.map2 one_arg arg_names args), body)
+        in
+        let* res = eval_stmt genv scope body in
+        match res with Continuing -> return [] | Returning vs -> return vs)
 
-  let run (ast : ast) (main_args : value list) : value list m =
+  let run (ast : ast) std_lib_extras (main_args : value list) : value list m =
     let genv = build_enums ast in
     let* genv = build_consts ast genv in
     let genv = build_funcs ast genv in
+    let genv = GEnv.add_seq_special_func (List.to_seq std_lib_extras) genv in
     eval_func genv "main" main_args
 end
