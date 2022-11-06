@@ -1,4 +1,5 @@
 %{
+
 open AST
 
 let eminus e = EBinop(MINUS, ELiteral (VInt 0), e)
@@ -11,10 +12,10 @@ let eminus e = EBinop(MINUS, ELiteral (VInt 0), e)
 %token <string> INT_LIT REAL_LIT BITVECTOR_LIT
 %token <bool> BOOL_LIT
 
-%type <AST.Parsed.parsed_t> ast
+%type <AST.parsed_t> ast
 
 %nonassoc NOT NEG
-%left PLUS SHR SHL RDIV OR MUL MINUS EOR DIV BOR BAND AND
+%left PLUS SHR SHL RDIV OR MUL MINUS EOR DIV BOR BAND AND IMPL 
 %nonassoc GT GEQ EQ_OP LT LEQ NEQ
 %right SEMI_COLON
 
@@ -34,22 +35,23 @@ value:
 | NOT { NOT }
 
 %inline binop:
+| AND { AND }
 | BAND { BAND }
 | BOR { BOR }
+| DIV { DIV }
+| EOR { EOR }
 | EQ_OP { EQ_OP }
 | NEQ { NEQ }
 | GT { GT }
 | GEQ { GEQ }
+| IMPL { IMPL }
 | LT { LT }
 | LEQ { LEQ }
 | PLUS { PLUS }
 | MINUS { MINUS }
-| OR { OR }
-| AND { AND }
-| EOR { EOR }
 | MUL { MUL }
+| OR { OR }
 | RDIV { RDIV }
-| DIV { DIV }
 | SHL { SHL }
 | SHR { SHR }
 

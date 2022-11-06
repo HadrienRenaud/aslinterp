@@ -1,10 +1,11 @@
 module type S = sig
   type vint
   type vbool
+  type vreal
   type vbitvector
   type 'a m
   type loc
-  type value = (vint, vbool, vbitvector) AST.value
+  type value = (vint, vbool, vreal, vbitvector) AST.value
 
   val vint_of_int : int -> vint
   val bind_data : 'a m -> ('a -> 'b m) -> 'b m

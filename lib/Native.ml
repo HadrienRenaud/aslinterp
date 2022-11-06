@@ -8,13 +8,16 @@ let pp_err chan = function
   | TypeError msg -> Printf.fprintf chan "Type error: %s" msg
   | InterpreterError msg -> Printf.fprintf chan "Interpreter error: %s" msg
 
+open AST
+
 module NativeBackend = struct
   type vint = int
   type vbool = bool
+  type vreal = float
   type vbitvector = int
   type 'a m = unit -> ('a, err) result
   type loc = string
-  type value = (vint, vbool, vbitvector) AST.value
+  type value = (vint, vbool, vreal, vbitvector) AST.value
 
   let vint_of_int i = i
 
@@ -67,22 +70,20 @@ module NativeBackend = struct
     | AST.NEG, AST.VInt i -> return (AST.VInt ~-i)
     | _ -> assert false
 
-  let write_identifier_genv genv x v = return (genv := AST.IMap.add x v !genv)
+  let write_identifier_genv genv x v = return (genv := IMap.add x v !genv)
 
   let read_identifier_genv genv x _is_data =
-    match AST.IMap.find_opt x !genv with
+    match IMap.find_opt x !genv with
     | Some v -> return v
     | None -> fail (UnknownIdentifier x)
 
   let write_identifier, read_identifier =
-    let genv = ref AST.IMap.empty in
+    let genv = ref IMap.empty in
     (write_identifier_genv genv, read_identifier_genv genv)
 end
 
 module NativeInterpreter = Interpreter.Make (NativeBackend)
 
 let of_parsed_ast =
-  AST.Parsed.tr
-    (fun i -> AST.VInt i)
-    (fun b -> AST.VBool b)
-    (fun s -> VBitVector (int_of_string s))
+  AST.tr_values value_of_vint value_of_vbool value_of_vreal (fun s ->
+      VBitVector (int_of_string s))
