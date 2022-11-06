@@ -90,7 +90,7 @@ stmt:
     { SReturn es }
 
 decl:
-| CONSTANT x=IDENTIFIER e=expr SEMI_COLON
+| CONSTANT x=IDENTIFIER EQ e=expr SEMI_COLON
     { GlobalConst (x, e) }
 | TYPE IDENTIFIER OF ENUMERATION LBRACE ls=separated_list(COMMA, IDENTIFIER) RBRACE
     { Enum ls }
