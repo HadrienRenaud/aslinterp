@@ -15,4 +15,4 @@ module NativeBackend :
 
 module NativeInterpreter : Interpreter.S with module B = NativeBackend
 
-val of_parsed_ast : AST.Parsed.parsed_t -> NativeBackend.value AST.t
+val of_parsed_ast : AST.parsed_t -> NativeBackend.value AST.t

@@ -1,22 +1,25 @@
 type unop = NEG | NOT
 
 type binop =
+  | AND
   | BAND
+  | BEQ
   | BOR
+  | DIV
+  | EOR
   | EQ_OP
-  | NEQ
   | GT
   | GEQ
+  | IMPL
   | LT
   | LEQ
-  | PLUS
+  | MOD
   | MINUS
-  | OR
-  | AND
-  | EOR
   | MUL
+  | NEQ
+  | OR
+  | PLUS
   | RDIV
-  | DIV
   | SHL
   | SHR
 
@@ -25,12 +28,18 @@ type identifier = string
 module ISet = Set.Make (String)
 module IMap = Map.Make (String)
 
-type ('i, 'b, 'bv) value =
+type ('i, 'b, 'r, 'bv) value =
   | VInt of 'i
   | VBool of 'b
+  | VReal of 'r
   | VBitVector of 'bv
-  | VTuple of ('i, 'b, 'bv) value list
-  | VRecord of ('i, 'b, 'bv) value IMap.t
+  | VTuple of ('i, 'b, 'r, 'bv) value list
+  | VRecord of ('i, 'b, 'r, 'bv) value IMap.t
+
+let value_of_vint i = VInt i
+let value_of_vbool b = VBool b
+let value_of_vreal r = VReal r
+let value_of_vbitvector bv = VBitVector bv
 
 type 'v expr =
   | ELiteral of 'v
@@ -77,37 +86,36 @@ let use_expr include_funcs : 'v expr -> ISet.t =
   in
   use_ ISet.empty
 
-module Parsed = struct
-  type parsed_value = (int, bool, string) value
-  type parsed_t = parsed_value t
+let tr_values tr_int tr_bool tr_real tr_bitvector =
+  let rec value_ = function
+    | VInt i -> tr_int i
+    | VBool b -> tr_bool b
+    | VBitVector s -> tr_bitvector s
+    | VReal r -> tr_real r
+    | VRecord r -> VRecord (IMap.map value_ r)
+    | VTuple li -> VTuple (List.map value_ li)
+  and expr_ = function
+    | ELiteral v -> ELiteral (value_ v)
+    | EVar x -> EVar x
+    | EUnop (op, e) -> EUnop (op, expr_ e)
+    | EBinop (op, e1, e2) -> EBinop (op, expr_ e1, expr_ e2)
+    | ECond (e1, e2, e3) -> ECond (expr_ e1, expr_ e2, expr_ e3)
+    | ECall (x, es) -> ECall (x, List.map expr_ es)
+  and lexpr_ = function LEVar x -> LEVar x
+  and stmt_ = function
+    | SPass -> SPass
+    | SAssign (le, e) -> SAssign (lexpr_ le, expr_ e)
+    | SCond (e, s1, s2) -> SCond (expr_ e, stmt_ s1, stmt_ s2)
+    | SCall (x, es) -> SCall (x, List.map expr_ es)
+    | SReturn es -> SReturn (List.map expr_ es)
+    | SThen (s1, s2) -> SThen (stmt_ s1, stmt_ s2)
+  and decl_ = function
+    | Func (x, args, body) -> Func (x, args, stmt_ body)
+    | Enum s -> Enum s
+    | GlobalConst (x, e) -> GlobalConst (x, expr_ e)
+  in
 
-  let tr tr_int tr_bool tr_bitvector =
-    let rec value_ = function
-      | VInt i -> tr_int i
-      | VBool b -> tr_bool b
-      | VBitVector s -> tr_bitvector s
-      | VRecord r -> VRecord (IMap.map value_ r)
-      | VTuple li -> VTuple (List.map value_ li)
-    and expr_ = function
-      | ELiteral v -> ELiteral (value_ v)
-      | EVar x -> EVar x
-      | EUnop (op, e) -> EUnop (op, expr_ e)
-      | EBinop (op, e1, e2) -> EBinop (op, expr_ e1, expr_ e2)
-      | ECond (e1, e2, e3) -> ECond (expr_ e1, expr_ e2, expr_ e3)
-      | ECall (x, es) -> ECall (x, List.map expr_ es)
-    and lexpr_ = function LEVar x -> LEVar x
-    and stmt_ = function
-      | SPass -> SPass
-      | SAssign (le, e) -> SAssign (lexpr_ le, expr_ e)
-      | SCond (e, s1, s2) -> SCond (expr_ e, stmt_ s1, stmt_ s2)
-      | SCall (x, es) -> SCall (x, List.map expr_ es)
-      | SReturn es -> SReturn (List.map expr_ es)
-      | SThen (s1, s2) -> SThen (stmt_ s1, stmt_ s2)
-    and decl_ = function
-      | Func (x, args, body) -> Func (x, args, stmt_ body)
-      | Enum s -> Enum s
-      | GlobalConst (x, e) -> GlobalConst (x, expr_ e)
-    in
+  List.map decl_
 
-    List.map decl_
-end
+type parsed_value = (int, bool, float, string) value
+type parsed_t = parsed_value t

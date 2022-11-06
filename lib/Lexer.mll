@@ -1,7 +1,7 @@
 {
 
 open LexMisc
-open NativeParser
+open Parser
 
 let tr_name s = match s with
 | "AND" -> AND
@@ -154,7 +154,7 @@ rule token = parse
     | '<'    { LT }
     | ">>"    { SHR }
     | "&&"    { BAND }
-    | "->"    { IMPL }
+    | "-->"    { IMPL }
     | "<<"    { SHL }
     | ']'    { RBRACKET }
     | ')'    { RPAR }

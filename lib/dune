@@ -1,8 +1,8 @@
-(ocamllex NativeLexer)
+(ocamllex Lexer)
 
 (menhir
- (modules NativeParser)
- (flags --unused-tokens --fixed-exception))
+ (modules Parser)
+ (flags --unused-tokens))
 
 (library
  (name aslinterp)

@@ -10,8 +10,8 @@ let pp_pos chan pos =
 let build_ast_from_file f =
   let lexbuf = Lexing.from_channel (open_in f) in
   let () = Lexing.set_filename lexbuf f in
-  try NativeParser.ast NativeLexer.token lexbuf with
-  | NativeParser.Error ->
+  try Parser.ast Lexer.token lexbuf with
+  | Parser.Error ->
       Printf.eprintf "%a: Cannot parse." pp_pos lexbuf.lex_curr_p;
       exit 1
   | LexMisc.Error (_msg, pos) ->
