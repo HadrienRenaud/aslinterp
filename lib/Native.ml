@@ -18,6 +18,15 @@ module NativeBackend = struct
   type 'a m = unit -> ('a, err) result
   type loc = string
   type value = (vint, vbool, vreal, vbitvector) AST.value
+  type scope = AST.identifier * int
+
+  module ScopedIdentifiers = struct
+    type t = identifier * scope
+
+    let compare = compare
+  end
+
+  module SIMap = Map.Make (ScopedIdentifiers)
 
   let vint_of_int i = i
 
@@ -72,7 +81,7 @@ module NativeBackend = struct
     | MUL, VReal v1, VReal v2 -> vreal (v1 *. v2)
     | MINUS, VReal v1, VReal v2 -> vreal (v1 -. v2)
     | DIV, VReal v1, VReal v2 -> vreal (v1 /. v2)
-    (* real -> real -> bool*)
+    (* real -> real -> bool *)
     | EQ_OP, VReal v1, VReal v2 -> vbool (v1 == v2)
     | NEQ, VReal v1, VReal v2 -> vbool (v1 <> v2)
     | LEQ, VReal v1, VReal v2 -> vbool (v1 <= v2)
@@ -90,16 +99,17 @@ module NativeBackend = struct
     | BNOT, VBool b -> return (VBool (not b))
     | _ -> assert false
 
-  let write_identifier_genv genv x v = return (genv := IMap.add x v !genv)
+  let write_identifier_genv env x scope v =
+    return (env := SIMap.add (x, scope) v !env)
 
-  let read_identifier_genv genv x _is_data =
-    match IMap.find_opt x !genv with
+  let read_identifier_genv env x scope _is_data =
+    match SIMap.find_opt (x, scope) !env with
     | Some v -> return v
     | None -> fail (UnknownIdentifier x)
 
   let write_identifier, read_identifier =
-    let genv = ref IMap.empty in
-    (write_identifier_genv genv, read_identifier_genv genv)
+    let env = ref SIMap.empty in
+    (write_identifier_genv env, read_identifier_genv env)
 end
 
 module NativeInterpreter = Interpreter.Make (NativeBackend)

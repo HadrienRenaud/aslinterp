@@ -10,7 +10,30 @@ module Make (B : Backend.S) = struct
   module B = B
   open B
 
-  type genv = value AST.IMap.t
+  module GEnv = struct
+    include AST.IMap
+
+    type elt = Value of value | Func of int ref * value AST.func
+    type t = elt AST.IMap.t
+
+    let add_value name v = add name (Value v)
+    let add_seq_value s = add_seq (Seq.map (fun (x, v) -> (x, Value v)) s)
+
+    let add_seq_func s =
+      add_seq (Seq.map (fun (x, f) -> (x, Func (ref 0, f))) s)
+
+    let find_opt_value name env =
+      Option.bind (find_opt name env) (function Value v -> Some v | _ -> None)
+
+    let mem_value name env = Option.is_some (find_opt_value name env)
+    let find_value name env = Option.get (find_opt_value name env)
+
+    let find_opt_func name env =
+      Option.bind (find_opt name env) (function
+        | Func (scope, f) -> Some (scope, f)
+        | _ -> None)
+  end
+
   type ast = value AST.t
 
   let ( let* ) = B.bind_data
@@ -25,9 +48,9 @@ module Make (B : Backend.S) = struct
 
   let value_of_int i : value = AST.VInt (vint_of_int i)
 
-  let build_enums (ast : ast) : genv =
+  let build_enums (ast : ast) : GEnv.t =
     let build_one (counter, genv) name =
-      let genv = AST.IMap.add name (value_of_int counter) genv in
+      let genv = GEnv.add_value name (value_of_int counter) genv in
       (counter + 1, genv)
     in
     let build_decl acc = function
@@ -38,16 +61,17 @@ module Make (B : Backend.S) = struct
     genv
 
   (* build every constant and make an global env *)
-  let build_consts (ast : ast) genv : genv m =
+  let build_consts (ast : ast) genv : GEnv.t m =
     let rec eval_one acc name =
-      if AST.IMap.mem name genv then return (AST.IMap.find name genv, acc)
-      else
-        match AST.IMap.find_opt name acc with
-        | Some (Either.Left v) -> return (v, acc)
-        | Some (Either.Right e) ->
-            let* v, acc = eval_expr acc e in
-            return (v, AST.IMap.add name (Either.Left v) acc)
-        | _ -> failwith ("Unknown constant " ^ name)
+      match GEnv.find_opt_value name genv with
+      | Some v -> return (v, acc)
+      | None -> (
+          match AST.IMap.find_opt name acc with
+          | Some (Either.Left v) -> return (v, acc)
+          | Some (Either.Right e) ->
+              let* v, acc = eval_expr acc e in
+              return (v, AST.IMap.add name (Either.Left v) acc)
+          | _ -> failwith ("Unknown constant " ^ name))
     and eval_expr acc e =
       let open AST in
       match e with
@@ -93,82 +117,89 @@ module Make (B : Backend.S) = struct
         | _ -> assert false
       in
       let new_items = Seq.map one_item acc_items in
-      let genv = AST.IMap.add_seq new_items genv in
+      let genv = GEnv.add_seq_value new_items genv in
       return genv
     in
     collect (eval_all (return init_acc))
 
+  let build_funcs ast genv =
+    List.to_seq ast
+    |> Seq.filter_map (function
+         | AST.Func (name, args, body) -> Some (name, (name, args, body))
+         | _ -> None)
+    |> fun s -> GEnv.add_seq_func s genv
+
   type eval_res = Returning of value list | Continuing
 
-  let rec eval_expr genv ast is_data =
+  let rec eval_expr genv scope is_data =
     let open AST in
     function
     | ELiteral v -> return v
-    | EVar x when IMap.mem x genv -> return (IMap.find x genv)
-    | EVar x -> read_identifier x is_data
+    | EVar x when GEnv.mem_value x genv -> return (GEnv.find_value x genv)
+    | EVar x -> read_identifier x scope is_data
     | EBinop (op, e1, e2) ->
-        let* v1 = eval_expr genv ast is_data e1
-        and* v2 = eval_expr genv ast is_data e2 in
+        let* v1 = eval_expr genv scope is_data e1
+        and* v2 = eval_expr genv scope is_data e2 in
         binop op v1 v2
     | EUnop (op, e) ->
-        let* v = eval_expr genv ast is_data e in
+        let* v = eval_expr genv scope is_data e in
         unop op v
     | ECond (e1, e2, e3) ->
-        let eval_ = eval_expr genv ast is_data in
+        let eval_ = eval_expr genv scope is_data in
         choice (eval_ e1) (eval_ e2) (eval_ e3)
     | ECall (name, args) -> (
-        let* vargs = prod_map (eval_expr genv ast is_data) args in
-        let* returned = eval_func genv ast name vargs in
+        let* vargs = prod_map (eval_expr genv scope is_data) args in
+        let* returned = eval_func genv name vargs in
         match returned with
         | [ v ] -> return v
         | _ ->
             failwith (Printf.sprintf "Return arrity error for function %s" name)
         )
 
-  and eval_stmt genv ast =
+  and eval_stmt genv scope =
     let open AST in
     function
     | SPass -> return Continuing
     | SAssign (LEVar x, e) ->
-        let* v = eval_expr genv ast true e in
-        let* () = write_identifier x v in
+        let* v = eval_expr genv scope true e in
+        let* () = write_identifier x scope v in
         return Continuing
     | SReturn es ->
-        let* vs = prod_map (eval_expr genv ast true) es in
+        let* vs = prod_map (eval_expr genv scope true) es in
         return (Returning vs)
     | SThen (s1, s2) -> (
-        let* r1 = eval_stmt genv ast s1 in
+        let* r1 = eval_stmt genv scope s1 in
         match r1 with
-        | Continuing -> eval_stmt genv ast s2
+        | Continuing -> eval_stmt genv scope s2
         | Returning vs -> return (Returning vs))
     | SCall (name, args) ->
-        let* vargs = prod_map (eval_expr genv ast true) args in
-        let* _ = eval_func genv ast name vargs in
+        let* vargs = prod_map (eval_expr genv scope true) args in
+        let* _ = eval_func genv name vargs in
         return Continuing
     | SCond (e, s1, s2) ->
         choice
-          (eval_expr genv ast true e)
-          (eval_stmt genv ast s1) (eval_stmt genv ast s2)
+          (eval_expr genv scope true e)
+          (eval_stmt genv scope s1) (eval_stmt genv scope s2)
 
-  and eval_func genv ast name args =
-    let* arg_names, body =
-      let has_name = function
-        | AST.Func (x, _, _) -> String.equal x name
-        | _ -> false
-      in
-      match List.find_opt has_name ast with
-      | Some (AST.Func (_x, arg_names, body)) -> return (arg_names, body)
-      | _ -> failwith ("Unknown function: " ^ name)
+  and eval_func genv name args =
+    let* scope, arg_names, body =
+      match GEnv.find_opt_func name genv with
+      | None -> failwith ("Unknown function: " ^ name)
+      | Some (r, (_, arg_names, body)) ->
+          let scope = (name, !r) in
+          let () = r := !r + 1 in
+          return (scope, arg_names, body)
     in
     let one_arg x v = AST.(SAssign (LEVar x, ELiteral v)) in
     let body =
       AST.SThen (AST.stmt_from_list (List.map2 one_arg arg_names args), body)
     in
-    let* res = eval_stmt genv ast body in
+    let* res = eval_stmt genv scope body in
     match res with Continuing -> return [] | Returning vs -> return vs
 
   let run (ast : ast) (main_args : value list) : value list m =
     let genv = build_enums ast in
     let* genv = build_consts ast genv in
-    eval_func genv ast "main" main_args
+    let genv = build_funcs ast genv in
+    eval_func genv "main" main_args
 end
