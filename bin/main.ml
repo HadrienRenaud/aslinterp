@@ -14,8 +14,8 @@ let build_ast_from_file f =
   | Parser.Error ->
       Printf.eprintf "%a: Cannot parse." pp_pos lexbuf.lex_curr_p;
       exit 1
-  | LexMisc.Error (_msg, pos) ->
-      Printf.eprintf "%a: unknown token." pp_pos pos;
+  | Lexer.LexerError ->
+      Printf.eprintf "%a: unknown token." pp_pos lexbuf.lex_curr_p;
       exit 1
 
 let exec ast =

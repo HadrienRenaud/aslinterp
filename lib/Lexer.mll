@@ -1,6 +1,14 @@
 {
 
-open LexMisc
+exception LexerError
+
+(* From herdtool's LexMisc *)
+let incr_lineno lexbuf =
+  let open Lexing in
+  let pos = lexbuf.lex_curr_p in
+  let n = pos.pos_lnum + 1 in
+  lexbuf.lex_curr_p <- { pos with pos_lnum = n; pos_bol = pos.pos_cnum }
+
 open Parser
 
 let tr_name s = match s with
@@ -186,4 +194,4 @@ rule token = parse
     | '%'     { MOD }
     | identifier as lxm { tr_name lxm }
     | eof               { EOF }
-    | ""     { error "ASL" lexbuf }
+    | ""     { raise LexerError }
