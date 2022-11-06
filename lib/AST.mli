@@ -1,6 +1,7 @@
 (** Operations on base value of arity one. *)
 type unop =
-  | NEG  (** Boolean inversion, integer or real negation *)
+  | BNOT  (** Boolean inversion *)
+  | NEG  (** Integer or real negation *)
   | NOT  (** Bitvector bitwise inversion *)
 
 (** Operations on base value of arity two. *)

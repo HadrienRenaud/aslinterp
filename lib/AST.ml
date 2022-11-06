@@ -1,4 +1,4 @@
-type unop = NEG | NOT
+type unop = BNOT | NEG | NOT
 
 type binop =
   | AND
