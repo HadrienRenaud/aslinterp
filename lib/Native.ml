@@ -87,7 +87,7 @@ module NativeBackend = struct
     match (op, v) with
     | NEG, VInt i -> return (VInt ~-i)
     | NEG, VReal r -> return (VReal ~-.r)
-    | NOT, VBool b -> return (VBool (not b))
+    | BNOT, VBool b -> return (VBool (not b))
     | _ -> assert false
 
   let write_identifier_genv genv x v = return (genv := IMap.add x v !genv)

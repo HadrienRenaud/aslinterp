@@ -149,7 +149,7 @@ rule token = parse
     | bitvector_lit as lxm    { BITVECTOR_LIT(lxm) }
     | "TRUE"            { BOOL_LIT(true) }
     | "FALSE"           { BOOL_LIT(false) }
-    | '!'    { NEG }
+    | '!'    { BNOT }
     | ','    { COMMA }
     | '<'    { LT }
     | ">>"    { SHR }
