@@ -42,8 +42,24 @@ module NativeBackend = struct
 
   let binop op v1 v2 =
     let open AST in
+    let vint v = return (VInt v) in
+    let vbool v = return (VBool v) in
     match (op, v1, v2) with
-    | PLUS, VInt v1, VInt v2 -> return (VInt (v1 + v2))
+    (* int -> int -> int *)
+    | PLUS, VInt v1, VInt v2 -> vint (v1 + v2)
+    | MUL, VInt v1, VInt v2 -> vint (v1 * v2)
+    | MINUS, VInt v1, VInt v2 -> vint (v1 - v2)
+    | DIV, VInt v1, VInt v2 -> vint (v1 / v2)
+    (* int -> int -> bool*)
+    | EQ_OP, VInt v1, VInt v2 -> vbool (v1 == v2)
+    | NEQ, VInt v1, VInt v2 -> vbool (v1 <> v2)
+    | LEQ, VInt v1, VInt v2 -> vbool (v1 <= v2)
+    | LT, VInt v1, VInt v2 -> vbool (v1 < v2)
+    | GEQ, VInt v1, VInt v2 -> vbool (v1 >= v2)
+    | GT, VInt v1, VInt v2 -> vbool (v1 > v2)
+    (* bool -> bool -> bool *)
+    | BAND, VBool b1, VBool b2 -> vbool (b1 && b2)
+    | BOR, VBool b1, VBool b2 -> vbool (b1 || b2)
     | _ -> assert false
 
   let unop op v =
