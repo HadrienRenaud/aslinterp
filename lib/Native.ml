@@ -44,9 +44,9 @@ module NativeBackend = struct
   let failwith msg = fail (InterpreterError msg)
 
   let binop op v1 v2 =
-    let open AST in
     let vint v = return (VInt v) in
     let vbool v = return (VBool v) in
+    let vreal r = return (VReal r) in
     match (op, v1, v2) with
     (* int -> int -> int *)
     | PLUS, VInt v1, VInt v2 -> vint (v1 + v2)
@@ -63,11 +63,31 @@ module NativeBackend = struct
     (* bool -> bool -> bool *)
     | BAND, VBool b1, VBool b2 -> vbool (b1 && b2)
     | BOR, VBool b1, VBool b2 -> vbool (b1 || b2)
-    | _ -> assert false
+    | BEQ, VBool b1, VBool b2 -> vbool (b1 == b2)
+    | IMPL, VBool b1, VBool b2 -> vbool ((not b1) || b2)
+    | EQ_OP, VBool b1, VBool b2 -> vbool (b1 == b2)
+    | NEQ, VBool b1, VBool b2 -> vbool (b1 <> b2)
+    (* real -> real -> real *)
+    | PLUS, VReal v1, VReal v2 -> vreal (v1 +. v2)
+    | MUL, VReal v1, VReal v2 -> vreal (v1 *. v2)
+    | MINUS, VReal v1, VReal v2 -> vreal (v1 -. v2)
+    | DIV, VReal v1, VReal v2 -> vreal (v1 /. v2)
+    (* real -> real -> bool*)
+    | EQ_OP, VReal v1, VReal v2 -> vbool (v1 == v2)
+    | NEQ, VReal v1, VReal v2 -> vbool (v1 <> v2)
+    | LEQ, VReal v1, VReal v2 -> vbool (v1 <= v2)
+    | LT, VReal v1, VReal v2 -> vbool (v1 < v2)
+    | GEQ, VReal v1, VReal v2 -> vbool (v1 >= v2)
+    | GT, VReal v1, VReal v2 -> vbool (v1 > v2)
+    | _ ->
+        fail
+          (InterpreterError "Operation not yet implemented for native backend.")
 
   let unop op v =
     match (op, v) with
-    | AST.NEG, AST.VInt i -> return (AST.VInt ~-i)
+    | NEG, VInt i -> return (VInt ~-i)
+    | NEG, VReal r -> return (VReal ~-.r)
+    | NOT, VBool b -> return (VBool (not b))
     | _ -> assert false
 
   let write_identifier_genv genv x v = return (genv := IMap.add x v !genv)
