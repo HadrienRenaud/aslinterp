@@ -38,14 +38,16 @@ module Make (B : Backend.S) = struct
     genv
 
   (* build every constant and make an global env *)
-  let build_consts (ast : ast) : genv -> genv m =
+  let build_consts (ast : ast) genv : genv m =
     let rec eval_one acc name =
-      match AST.IMap.find_opt name acc with
-      | Some (Either.Left v) -> return (v, acc)
-      | Some (Either.Right e) ->
-          let* v, acc = eval_expr acc e in
-          return (v, AST.IMap.add name (Either.Left v) acc)
-      | _ -> assert false
+      if AST.IMap.mem name genv then return (AST.IMap.find name genv, acc)
+      else
+        match AST.IMap.find_opt name acc with
+        | Some (Either.Left v) -> return (v, acc)
+        | Some (Either.Right e) ->
+            let* v, acc = eval_expr acc e in
+            return (v, AST.IMap.add name (Either.Left v) acc)
+        | _ -> failwith ("Unknown constant " ^ name)
     and eval_expr acc e =
       let open AST in
       match e with
@@ -60,8 +62,11 @@ module Make (B : Backend.S) = struct
           let* v2, acc = eval_expr acc e2 in
           let* v = B.binop op v1 v2 in
           return (v, acc)
-      | ECall _ -> assert false
-      | ECond _ -> assert false
+      | ECond (e1, e2, e3) ->
+          let* v, acc = eval_expr acc e1 in
+          choice (return v) (eval_expr acc e2) (eval_expr acc e3)
+      | ECall _ ->
+          failwith "Function calling in constants is not yet implemented"
     in
     let init_acc =
       let one_decl acc = function
@@ -80,7 +85,7 @@ module Make (B : Backend.S) = struct
       in
       List.fold_left one_decl acc ast
     in
-    let collect acc genv =
+    let collect acc =
       let* acc = acc in
       let acc_items = AST.IMap.to_seq acc in
       let one_item = function
@@ -91,7 +96,7 @@ module Make (B : Backend.S) = struct
       let genv = AST.IMap.add_seq new_items genv in
       return genv
     in
-    fun genv -> collect (eval_all (return init_acc)) genv
+    collect (eval_all (return init_acc))
 
   type eval_res = Returning of value list | Continuing
 
@@ -146,14 +151,14 @@ module Make (B : Backend.S) = struct
           (eval_stmt genv ast s1) (eval_stmt genv ast s2)
 
   and eval_func genv ast name args =
-    let arg_names, body =
+    let* arg_names, body =
       let has_name = function
         | AST.Func (x, _, _) -> String.equal x name
         | _ -> false
       in
       match List.find_opt has_name ast with
-      | Some (AST.Func (_x, arg_names, body)) -> (arg_names, body)
-      | _ -> assert false
+      | Some (AST.Func (_x, arg_names, body)) -> return (arg_names, body)
+      | _ -> failwith ("Unknown function: " ^ name)
     in
     let one_arg x v = AST.(SAssign (LEVar x, ELiteral v)) in
     let body =
