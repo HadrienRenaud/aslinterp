@@ -22,7 +22,9 @@ module Make (B : Backend.S) = struct
       let* v = f elt and* li = acc in
       return (v :: li)
     in
-    List.fold_left one (return [])
+    fun li ->
+      let* li = List.fold_left one (return []) li in
+      return (List.rev li)
 
   let value_of_int i : value = AST.VInt (vint_of_int i)
 
