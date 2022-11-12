@@ -60,13 +60,19 @@ module Make (B : Backend.S) = struct
     let find_value name env = Option.get (find_opt_value name env)
   end
 
+  module LEnv = AST.IMap
+
+  type genv = GEnv.t
+  type lenv = value LEnv.t
+  type env = genv * lenv
+
   (*****************************************************************************)
   (*                                                                           *)
   (*                      Construction of the initial env                      *)
   (*                                                                           *)
   (*****************************************************************************)
 
-  let build_enums (ast : ast) : GEnv.t =
+  let build_enums (ast : ast) : genv =
     let build_one (counter, genv) name =
       let genv = GEnv.add_value name (value_of_int counter) genv in
       (counter + 1, genv)
@@ -79,7 +85,7 @@ module Make (B : Backend.S) = struct
     genv
 
   (* build every constant and make an global env *)
-  let build_consts (ast : ast) genv : GEnv.t m =
+  let build_consts (ast : ast) genv : genv m =
     let rec eval_one acc name =
       match GEnv.find_opt_value name genv with
       | Some v -> return (v, acc)
@@ -147,7 +153,9 @@ module Make (B : Backend.S) = struct
          | _ -> None)
     |> fun s -> GEnv.add_seq_func s genv
 
-  type eval_res = Returning of value list | Continuing
+  type eval_res = Returning of value list | Continuing of lenv
+
+  let continue ((_genv, lenv) : env) = return (Continuing lenv)
 
   (*****************************************************************************)
   (*                                                                           *)
@@ -155,55 +163,62 @@ module Make (B : Backend.S) = struct
   (*                                                                           *)
   (*****************************************************************************)
 
-  let rec eval_expr genv scope is_data =
+  let rec eval_expr (env : env) scope is_data =
+    let genv, lenv = env in
     let open AST in
     function
     | ELiteral v -> return v
     | EVar x when GEnv.mem_value x genv -> return (GEnv.find_value x genv)
-    | EVar x -> read_identifier x scope is_data
+    | EVar x when LEnv.mem x lenv ->
+        let v = LEnv.find x lenv in
+        let* () = on_read_identifier x scope v in
+        return v
+    | EVar x -> failwith (Printf.sprintf "Unknown identifier: %s" x)
     | EBinop (op, e1, e2) ->
-        let* v1 = eval_expr genv scope is_data e1
-        and* v2 = eval_expr genv scope is_data e2 in
+        let* v1 = eval_expr env scope is_data e1
+        and* v2 = eval_expr env scope is_data e2 in
         binop op v1 v2
     | EUnop (op, e) ->
-        let* v = eval_expr genv scope is_data e in
+        let* v = eval_expr env scope is_data e in
         unop op v
     | ECond (e1, e2, e3) ->
-        let eval_ = eval_expr genv scope is_data in
+        let eval_ = eval_expr env scope is_data in
         choice (eval_ e1) (eval_ e2) (eval_ e3)
     | ECall (name, args) -> (
-        let* vargs = prod_map (eval_expr genv scope is_data) args in
-        let* returned = eval_func genv name vargs in
+        let* vargs = prod_map (eval_expr env scope is_data) args in
+        let* returned = eval_func (fst env) name vargs in
         match returned with
         | [ v ] -> return v
         | _ ->
             failwith (Printf.sprintf "Return arrity error for function %s" name)
         )
 
-  and eval_stmt genv scope =
+  and eval_stmt (env : env) scope =
     let open AST in
     function
-    | SPass -> return Continuing
+    | SPass -> continue env
     | SAssign (LEVar x, e) ->
-        let* v = eval_expr genv scope true e in
-        let* () = write_identifier x scope v in
-        return Continuing
+        let* v = eval_expr env scope true e in
+        let* () = on_write_identifier x scope v in
+        let genv, lenv = env in
+        let lenv = LEnv.add x v lenv in
+        continue (genv, lenv)
     | SReturn es ->
-        let* vs = prod_map (eval_expr genv scope true) es in
+        let* vs = prod_map (eval_expr env scope true) es in
         return (Returning vs)
-    | SThen (s1, s2) -> (
-        let* r1 = eval_stmt genv scope s1 in
-        match r1 with
-        | Continuing -> eval_stmt genv scope s2
-        | Returning vs -> return (Returning vs))
+    | SThen (s1, s2) ->
+        bind_seq (eval_stmt env scope s1) (fun r1 ->
+            match r1 with
+            | Continuing lenv -> eval_stmt (fst env, lenv) scope s2
+            | Returning vs -> return (Returning vs))
     | SCall (name, args) ->
-        let* vargs = prod_map (eval_expr genv scope true) args in
-        let* _ = eval_func genv name vargs in
-        return Continuing
+        let* vargs = prod_map (eval_expr env scope true) args in
+        let* _ = eval_func (fst env) name vargs in
+        continue env
     | SCond (e, s1, s2) ->
         choice
-          (eval_expr genv scope true e)
-          (eval_stmt genv scope s1) (eval_stmt genv scope s2)
+          (eval_expr env scope true e)
+          (eval_stmt env scope s1) (eval_stmt env scope s2)
 
   and eval_func genv name args =
     match GEnv.find_opt name genv with
@@ -216,15 +231,16 @@ module Make (B : Backend.S) = struct
         let one_arg x v = AST.(SAssign (LEVar x, ELiteral v)) in
         let body =
           let arg_names =
-            if List.compare_lengths args arg_names == 0 then
-              arg_names
+            if List.compare_lengths args arg_names == 0 then arg_names
             else
-              List.of_seq @@ Seq.take (List.length args) @@ List.to_seq arg_names
-            in
+              List.to_seq arg_names
+              |> Seq.take (List.length args)
+              |> List.of_seq
+          in
           AST.SThen (AST.stmt_from_list (List.map2 one_arg arg_names args), body)
         in
-        let* res = eval_stmt genv scope body in
-        match res with Continuing -> return [] | Returning vs -> return vs)
+        let* res = eval_stmt (genv, LEnv.empty) scope body in
+        match res with Continuing _ -> return [] | Returning vs -> return vs)
 
   let run (ast : ast) std_lib_extras (main_args : value list) : value list m =
     let genv = build_enums ast in
