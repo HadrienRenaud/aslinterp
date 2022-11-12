@@ -1,4 +1,0 @@
-(executable
- (public_name asli)
- (name main)
- (libraries aslinterp))
