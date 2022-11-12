@@ -99,17 +99,8 @@ module NativeBackend = struct
     | BNOT, VBool b -> return (VBool (not b))
     | _ -> assert false
 
-  let write_identifier_genv env x scope v =
-    return (env := SIMap.add (x, scope) v !env)
-
-  let read_identifier_genv env x scope _is_data =
-    match SIMap.find_opt (x, scope) !env with
-    | Some v -> return v
-    | None -> fail (UnknownIdentifier x)
-
-  let write_identifier, read_identifier =
-    let env = ref SIMap.empty in
-    (write_identifier_genv env, read_identifier_genv env)
+  let on_write_identifier _x _scope _value = return ()
+  let on_read_identifier _x _scope _value = return ()
 end
 
 module NativeInterpreter = Interpreter.Make (NativeBackend)

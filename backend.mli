@@ -20,6 +20,6 @@ module type S = sig
   val failwith : string -> 'a m
   val binop : AST.binop -> value -> value -> value m
   val unop : AST.unop -> value -> value m
-  val write_identifier : AST.identifier -> scope -> value -> unit m
-  val read_identifier : AST.identifier -> scope -> bool -> value m
+  val on_write_identifier : AST.identifier -> scope -> value -> unit m
+  val on_read_identifier : AST.identifier -> scope -> value -> unit m
 end
