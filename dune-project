@@ -1,6 +1,6 @@
 (lang dune 3.4)
 
-(name aslinterp)
+(name asli)
 
 (generate_opam_files true)
 
@@ -18,7 +18,7 @@
 (using menhir 2.1)
 
 (package
- (name aslinterp)
+ (name asli)
  (synopsis "A small but functionnal interpretor for ASL")
  (depends ocaml dune zarith alcotest menhir)
  (tags

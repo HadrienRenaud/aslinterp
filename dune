@@ -5,7 +5,7 @@
  (flags --unused-tokens))
 
 (library
- (name asl)
+ (public_name asli)
  (modules
   (:standard \ main))
  (modules_without_implementation backend))
@@ -13,5 +13,5 @@
 (executable
  (public_name asli)
  (name main)
- (libraries asl)
+ (libraries asli)
  (modules main))
