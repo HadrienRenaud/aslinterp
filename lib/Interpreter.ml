@@ -215,6 +215,12 @@ module Make (B : Backend.S) = struct
         let () = r := !r + 1 in
         let one_arg x v = AST.(SAssign (LEVar x, ELiteral v)) in
         let body =
+          let arg_names =
+            if List.compare_lengths args arg_names == 0 then
+              arg_names
+            else
+              List.of_seq @@ Seq.take (List.length args) @@ List.to_seq arg_names
+            in
           AST.SThen (AST.stmt_from_list (List.map2 one_arg arg_names args), body)
         in
         let* res = eval_stmt genv scope body in
