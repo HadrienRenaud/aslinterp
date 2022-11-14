@@ -18,9 +18,18 @@
 (using menhir 2.1)
 
 (package
- (name asli)
- (synopsis "A small but functionnal interpretor for ASL")
+ (name asllib)
+ (version 0.1.0-dev)
+ (synopsis "Dev libraries to work with ASL language.")
  (depends ocaml dune zarith alcotest menhir)
+ (tags
+  (topics asl ocaml)))
+
+(package
+ (name asli)
+ (version 0.3.0-dev)
+ (synopsis "A small but functionnal interpretor for ASL")
+ (depends ocaml dune asllib alcotest)
  (tags
   (topics asl ocaml interpretor)))
 
